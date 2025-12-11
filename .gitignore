@@ -38,6 +38,7 @@ bld/
 #Rider and Claude
 **/.claude
 **/.rider
+**/.idea
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
