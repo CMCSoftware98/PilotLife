@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Export PilotLife Logo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      background: #1a1a2e;
+      font-family: sans-serif;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    h2 {
+      color: white;
+      margin: 0;
+    }
+    .preview {
+      background: repeating-conic-gradient(#808080 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    canvas {
+      display: block;
+    }
+    button {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .sizes {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>PilotLife Logo Export</h2>
+    <p style="color: #aaa;">Preview (transparent background shown as checkerboard):</p>
+
+    <div class="preview">
+      <canvas id="canvas" width="560" height="140"></canvas>
+    </div>
+
+    <div class="sizes">
+      <button onclick="downloadPNG(1)">Download PNG (280x70)</button>
+      <button onclick="downloadPNG(2)">Download PNG @2x (560x140)</button>
+      <button onclick="downloadPNG(4)">Download PNG @4x (1120x280)</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Wait for font to load
+    document.fonts.ready.then(() => {
+      drawLogo(2); // Draw at 2x for preview
+    });
+
+    function drawLogo(scale) {
+      const w = 280 * scale;
+      const h = 70 * scale;
+      canvas.width = w;
+      canvas.height = h;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.scale(scale, scale);
+
+      // Create gradients
+      const textGrad = ctx.createLinearGradient(10, 0, 200, 42);
+      textGrad.addColorStop(0, '#0ea5e9');
+      textGrad.addColorStop(1, '#8b5cf6');
+
+      const contrailGrad = ctx.createLinearGradient(10, 0, 240, 0);
+      contrailGrad.addColorStop(0, 'rgba(14, 165, 233, 0)');
+      contrailGrad.addColorStop(0.3, 'rgba(14, 165, 233, 0.4)');
+      contrailGrad.addColorStop(0.7, 'rgba(6, 182, 212, 0.7)');
+      contrailGrad.addColorStop(1, 'rgba(139, 92, 246, 1)');
+
+      const contrailGradLight = ctx.createLinearGradient(30, 0, 237, 0);
+      contrailGradLight.addColorStop(0, 'rgba(14, 165, 233, 0)');
+      contrailGradLight.addColorStop(0.4, 'rgba(6, 182, 212, 0.2)');
+      contrailGradLight.addColorStop(1, 'rgba(139, 92, 246, 0.5)');
+
+      const planeGrad = ctx.createLinearGradient(240, 40, 270, 50);
+      planeGrad.addColorStop(0, '#0ea5e9');
+      planeGrad.addColorStop(1, '#8b5cf6');
+
+      // Draw text
+      ctx.font = '800 42px Outfit';
+      ctx.fillStyle = textGrad;
+      ctx.fillText('PilotLife', 10, 42);
+
+      // Draw main contrail
+      ctx.beginPath();
+      ctx.moveTo(10, 55);
+      ctx.quadraticCurveTo(80, 55, 140, 54);
+      ctx.quadraticCurveTo(200, 53, 255, 51);
+      ctx.strokeStyle = contrailGrad;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Draw secondary contrail
+      ctx.beginPath();
+      ctx.moveTo(30, 58);
+      ctx.quadraticCurveTo(90, 57, 150, 56);
+      ctx.quadraticCurveTo(200, 55, 252, 53);
+      ctx.strokeStyle = contrailGradLight;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw airplane
+      ctx.save();
+      ctx.translate(250, 46);
+      ctx.rotate(-3 * Math.PI / 180);
+
+      // Fuselage
+      ctx.beginPath();
+      ctx.ellipse(8, 4, 12, 3, 0, 0, Math.PI * 2);
+      ctx.fillStyle = planeGrad;
+      ctx.fill();
+
+      // Nose
+      ctx.beginPath();
+      ctx.moveTo(18, 2);
+      ctx.quadraticCurveTo(24, 4, 18, 6);
+      ctx.closePath();
+      ctx.fill();
+
+      // Top wing
+      ctx.beginPath();
+      ctx.moveTo(6, 2);
+      ctx.lineTo(2, -4);
+      ctx.lineTo(6, -4);
+      ctx.lineTo(12, 1);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bottom wing
+      ctx.beginPath();
+      ctx.moveTo(6, 6);
+      ctx.lineTo(2, 12);
+      ctx.lineTo(6, 12);
+      ctx.lineTo(12, 7);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tail fin
+      ctx.beginPath();
+      ctx.moveTo(-2, 4);
+      ctx.lineTo(-4, -1);
+      ctx.lineTo(0, -1);
+      ctx.lineTo(2, 3);
+      ctx.closePath();
+      ctx.fill();
+
+      // Horizontal stabilizers
+      ctx.beginPath();
+      ctx.moveTo(-2, 3);
+      ctx.lineTo(-4, 1);
+      ctx.lineTo(0, 2);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(-2, 5);
+      ctx.lineTo(-4, 7);
+      ctx.lineTo(0, 6);
+      ctx.closePath();
+      ctx.fill();
+
+      // Cockpit highlight
+      ctx.beginPath();
+      ctx.ellipse(16, 4, 2, 1, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fill();
+
+      ctx.restore();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
+    function downloadPNG(scale) {
+      drawLogo(scale);
+      const link = document.createElement('a');
+      link.download = `pilotlife-logo${scale > 1 ? '@' + scale + 'x' : ''}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      drawLogo(2); // Reset to preview
+    }
+  </script>
+</body>
+</html>

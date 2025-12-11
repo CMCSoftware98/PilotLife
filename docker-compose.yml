@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  pilotlife-db:
+    image: postgres:16-alpine
+    container_name: pilotlife-postgres
+    environment:
+      POSTGRES_USER: pilotlife
+      POSTGRES_PASSWORD: pilotlife_dev_password
+      POSTGRES_DB: pilotlife
+    ports:
+      - "5432:5432"
+    volumes:
+      - pilotlife_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pilotlife -d pilotlife"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pilotlife_postgres_data:

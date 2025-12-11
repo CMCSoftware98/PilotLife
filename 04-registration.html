@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PilotLife - Create Account</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-elevated: #f1f5f9;
+      --accent-primary: #0ea5e9;
+      --accent-secondary: #06b6d4;
+      --accent-tertiary: #8b5cf6;
+      --accent-warm: #f97316;
+      --accent-success: #10b981;
+      --accent-glow: rgba(14, 165, 233, 0.1);
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border-subtle: #e2e8f0;
+      --border-accent: rgba(14, 165, 233, 0.3);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Animated background */
+    .bg-decoration {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .bg-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.6;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .bg-blob.blob-1 {
+      width: 500px;
+      height: 500px;
+      background: linear-gradient(135deg, #bfdbfe, #ddd6fe);
+      top: -10%;
+      left: -5%;
+      animation-delay: 0s;
+    }
+
+    .bg-blob.blob-2 {
+      width: 400px;
+      height: 400px;
+      background: linear-gradient(135deg, #a5f3fc, #99f6e4);
+      bottom: -10%;
+      right: 30%;
+      animation-delay: -7s;
+    }
+
+    .bg-blob.blob-3 {
+      width: 300px;
+      height: 300px;
+      background: linear-gradient(135deg, #fecaca, #fed7aa);
+      top: 40%;
+      right: -5%;
+      animation-delay: -14s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(30px, -30px) scale(1.05); }
+      50% { transform: translate(-20px, 20px) scale(0.95); }
+      75% { transform: translate(20px, 30px) scale(1.02); }
+    }
+
+    /* Left panel - Branding */
+    .brand-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .logo-container {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .logo-icon {
+      width: 90px;
+      height: 90px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .logo-icon svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 4px 12px rgba(14, 165, 233, 0.3));
+    }
+
+    .logo-text {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-tertiary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+    }
+
+    .logo-tagline {
+      font-size: 16px;
+      letter-spacing: 3px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .features-list {
+      list-style: none;
+      max-width: 380px;
+    }
+
+    .features-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+      margin-bottom: 28px;
+      opacity: 0;
+      animation: fadeSlideIn 0.6s ease forwards;
+    }
+
+    .features-list li:nth-child(1) { animation-delay: 0.3s; }
+    .features-list li:nth-child(2) { animation-delay: 0.45s; }
+    .features-list li:nth-child(3) { animation-delay: 0.6s; }
+
+    @keyframes fadeSlideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .feature-icon {
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+    }
+
+    .feature-icon svg {
+      width: 24px;
+      height: 24px;
+      stroke: white;
+    }
+
+    .feature-text h4 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    .feature-text p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Right panel - Auth form */
+    .auth-panel {
+      width: 560px;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 48px 60px;
+      position: relative;
+      z-index: 2;
+      box-shadow: -10px 0 40px rgba(0, 0, 0, 0.05);
+      overflow-y: auto;
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 32px;
+      background: var(--bg-elevated);
+      padding: 6px;
+      border-radius: 14px;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .auth-tab.active {
+      background: var(--bg-secondary);
+      color: var(--accent-primary);
+      box-shadow: var(--shadow-md);
+    }
+
+    .auth-tab:hover:not(.active) {
+      color: var(--text-primary);
+    }
+
+    .form-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .form-subtitle {
+      color: var(--text-secondary);
+      font-size: 15px;
+      margin-bottom: 28px;
+    }
+
+    /* Progress steps */
+    .progress-steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-number {
+      width: 32px;
+      height: 32px;
+      background: var(--bg-elevated);
+      border: 2px solid var(--border-subtle);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      transition: all 0.3s ease;
+    }
+
+    .step.active .step-number {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: white;
+    }
+
+    .step.completed .step-number {
+      background: var(--accent-success);
+      border-color: var(--accent-success);
+      color: white;
+    }
+
+    .step-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .step.active .step-label {
+      color: var(--accent-primary);
+    }
+
+    .step.completed .step-label {
+      color: var(--accent-success);
+    }
+
+    .step-connector {
+      width: 40px;
+      height: 3px;
+      background: var(--border-subtle);
+      border-radius: 2px;
+    }
+
+    .step-connector.completed {
+      background: var(--accent-success);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      flex: 1;
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--bg-elevated);
+      border: 2px solid transparent;
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      background: var(--bg-secondary);
+      box-shadow: 0 0 0 4px var(--accent-glow);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .form-select {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--bg-elevated);
+      border: 2px solid transparent;
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 20px;
+    }
+
+    .form-select:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      background-color: var(--bg-secondary);
+    }
+
+    /* Callsign preview */
+    .callsign-preview {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(139, 92, 246, 0.05));
+      border: 2px dashed var(--border-accent);
+      border-radius: 12px;
+      margin-top: 12px;
+    }
+
+    .callsign-preview-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+    }
+
+    .callsign-preview-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke: white;
+    }
+
+    .callsign-preview-text {
+      flex: 1;
+    }
+
+    .callsign-preview-text span {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .callsign-preview-text strong {
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      color: var(--accent-primary);
+      letter-spacing: 2px;
+    }
+
+    /* Password strength */
+    .password-strength {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .strength-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--border-subtle);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .strength-bar.weak {
+      background: #ef4444;
+    }
+
+    .strength-bar.medium {
+      background: var(--accent-warm);
+    }
+
+    .strength-bar.strong {
+      background: var(--accent-success);
+    }
+
+    .strength-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-weight: 500;
+    }
+
+    .strength-text.strong {
+      color: var(--accent-success);
+    }
+
+    /* Info box */
+    .info-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px 18px;
+      background: rgba(14, 165, 233, 0.08);
+      border: 1px solid rgba(14, 165, 233, 0.2);
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    .info-box svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--accent-primary);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .info-box p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .form-checkbox {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .checkbox-input {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--accent-primary);
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .checkbox-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .checkbox-label a {
+      color: var(--accent-primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .checkbox-label a:hover {
+      text-decoration: underline;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 18px;
+      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .submit-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(14, 165, 233, 0.35);
+    }
+
+    .submit-btn:hover::before {
+      left: 100%;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .divider-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border-subtle);
+    }
+
+    .divider-text {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .social-login {
+      display: flex;
+      gap: 12px;
+    }
+
+    .social-btn {
+      flex: 1;
+      padding: 14px;
+      background: var(--bg-secondary);
+      border: 2px solid var(--border-subtle);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .social-btn:hover {
+      background: var(--bg-elevated);
+      border-color: var(--accent-primary);
+    }
+
+    .social-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Decorative plane */
+    .plane-decoration {
+      position: fixed;
+      bottom: 40px;
+      left: 40px;
+      opacity: 0.08;
+      z-index: 1;
+    }
+
+    .plane-decoration svg {
+      width: 200px;
+      height: 200px;
+      fill: var(--accent-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-decoration">
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+    <div class="bg-blob blob-3"></div>
+  </div>
+
+  <div class="plane-decoration">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+    </svg>
+  </div>
+
+  <!-- Brand Panel -->
+  <div class="brand-panel">
+    <div class="logo-container">
+      <div class="logo-icon">
+        <svg viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="45" cy="45" r="42" stroke="url(#logo-grad)" stroke-width="3" fill="white"/>
+          <path d="M45 20L65 35V55L45 70L25 55V35L45 20Z" fill="url(#logo-grad)" opacity="0.15"/>
+          <path d="M58 45L45 25L32 45L45 65L58 45Z" fill="url(#logo-grad)"/>
+          <circle cx="45" cy="45" r="8" fill="white"/>
+          <circle cx="45" cy="45" r="4" fill="url(#logo-grad)"/>
+          <defs>
+            <linearGradient id="logo-grad" x1="10" y1="10" x2="80" y2="80">
+              <stop offset="0%" stop-color="#0ea5e9"/>
+              <stop offset="100%" stop-color="#8b5cf6"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="logo-text">PilotLife</div>
+      <div class="logo-tagline">Your Virtual Career Awaits</div>
+    </div>
+
+    <ul class="features-list">
+      <li>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+            <path d="M2 17L12 22L22 17"/>
+            <path d="M2 12L12 17L22 12"/>
+          </svg>
+        </div>
+        <div class="feature-text">
+          <h4>Dynamic Economy</h4>
+          <p>Real-time market simulation with live cargo pricing and passenger demand curves</p>
+        </div>
+      </li>
+      <li>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+            <path d="M22 12H18L15 21L9 3L6 12H2"/>
+          </svg>
+        </div>
+        <div class="feature-text">
+          <h4>Smart Flight Tracking</h4>
+          <p>Seamless MSFS integration with detailed performance analytics and insights</p>
+        </div>
+      </li>
+      <li>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+            <path d="M12 20V10"/>
+            <path d="M18 20V4"/>
+            <path d="M6 20V16"/>
+          </svg>
+        </div>
+        <div class="feature-text">
+          <h4>Career Progression</h4>
+          <p>Build your airline empire from regional routes to global operations</p>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Auth Panel -->
+  <div class="auth-panel">
+    <div class="auth-tabs">
+      <button class="auth-tab">Sign In</button>
+      <button class="auth-tab active">Create Account</button>
+    </div>
+
+    <h2 class="form-title">Join PilotLife 🚀</h2>
+    <p class="form-subtitle">Create your pilot account and start your virtual career</p>
+
+    <!-- Progress Steps -->
+    <div class="progress-steps">
+      <div class="step completed">
+        <div class="step-number">✓</div>
+        <span class="step-label">Account</span>
+      </div>
+      <div class="step-connector completed"></div>
+      <div class="step active">
+        <div class="step-number">2</div>
+        <span class="step-label">Profile</span>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <span class="step-label">Confirm</span>
+      </div>
+    </div>
+
+    <form>
+      <div class="info-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <p>Your callsign will be your unique identifier across all PilotLife services. Choose wisely!</p>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">First Name</label>
+          <input type="text" class="form-input" placeholder="John">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name</label>
+          <input type="text" class="form-input" placeholder="Doe">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" class="form-input" placeholder="pilot@example.com">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Callsign</label>
+          <input type="text" class="form-input" placeholder="SKYKING47" maxlength="10" style="text-transform: uppercase;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Home Airport</label>
+          <input type="text" class="form-input" placeholder="KJFK" maxlength="4" style="text-transform: uppercase;">
+        </div>
+      </div>
+
+      <div class="callsign-preview">
+        <div class="callsign-preview-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+            <path d="M22 2L11 13"/>
+            <path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+          </svg>
+        </div>
+        <div class="callsign-preview-text">
+          <span>Your Callsign Preview</span>
+          <strong>SKYKING47</strong>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 20px;">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" placeholder="Create a strong password">
+        <div class="password-strength">
+          <div class="strength-bar strong"></div>
+          <div class="strength-bar strong"></div>
+          <div class="strength-bar strong"></div>
+          <div class="strength-bar medium"></div>
+        </div>
+        <p class="strength-text strong">Strong password ✓</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Confirm Password</label>
+        <input type="password" class="form-input" placeholder="Confirm your password">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Experience Level</label>
+        <select class="form-select">
+          <option value="">Select your experience...</option>
+          <option value="beginner">Beginner - Just starting out</option>
+          <option value="intermediate">Intermediate - Some flight sim experience</option>
+          <option value="advanced">Advanced - Experienced virtual pilot</option>
+          <option value="expert">Expert - Real-world pilot or instructor</option>
+        </select>
+      </div>
+
+      <div class="form-checkbox">
+        <input type="checkbox" class="checkbox-input" id="terms">
+        <label class="checkbox-label" for="terms">
+          I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>. I understand that my flight data will be tracked for career progression.
+        </label>
+      </div>
+
+      <div class="form-checkbox">
+        <input type="checkbox" class="checkbox-input" id="newsletter" checked>
+        <label class="checkbox-label" for="newsletter">
+          Send me updates about new features, community events, and special offers
+        </label>
+      </div>
+
+      <button type="submit" class="submit-btn">Create Pilot Account</button>
+    </form>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <span class="divider-text">or register with</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="social-login">
+      <button class="social-btn">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Google
+      </button>
+      <button class="social-btn">
+        <svg viewBox="0 0 24 24" fill="#1877F2">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+        Facebook
+      </button>
+    </div>
+  </div>
+</body>
+</html>
