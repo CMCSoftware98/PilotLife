@@ -10,6 +10,16 @@
       <h2 class="form-title">Welcome back, Pilot!</h2>
       <p class="form-subtitle">Sign in to continue your flight career</p>
 
+      <!-- Error Message -->
+      <div v-if="errorMessage" class="error-message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>{{ errorMessage }}</span>
+      </div>
+
       <v-form @submit.prevent="handleLogin" class="auth-form">
         <div class="form-group">
           <label class="form-label">Email Address</label>
@@ -69,8 +79,11 @@ import BackgroundDecoration from '../components/BackgroundDecoration.vue'
 import BrandPanel from '../components/BrandPanel.vue'
 import AuthTabs from '../components/AuthTabs.vue'
 import SocialLogin from '../components/SocialLogin.vue'
+import { api } from '../services/api'
+import { useUserStore } from '../stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const activeTab = ref<'login' | 'register'>('login')
 const email = ref('')
@@ -78,6 +91,7 @@ const password = ref('')
 const rememberMe = ref(true)
 const showPassword = ref(false)
 const loading = ref(false)
+const errorMessage = ref('')
 
 watch(activeTab, (newTab) => {
   if (newTab === 'register') {
@@ -87,10 +101,30 @@ watch(activeTab, (newTab) => {
 
 const handleLogin = async () => {
   loading.value = true
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1500))
+  errorMessage.value = ''
+
+  const response = await api.auth.login({
+    email: email.value,
+    password: password.value,
+  })
+
   loading.value = false
-  console.log('Login:', { email: email.value, password: password.value, rememberMe: rememberMe.value })
+
+  if (response.error) {
+    errorMessage.value = response.error
+    return
+  }
+
+  if (response.data) {
+    userStore.setUser({
+      id: response.data.id,
+      email: response.data.email,
+      firstName: response.data.firstName,
+      lastName: response.data.lastName,
+      experienceLevel: response.data.experienceLevel,
+    })
+    router.push('/')
+  }
 }
 </script>
 
@@ -204,5 +238,24 @@ const handleLogin = async () => {
 
 .submit-btn :deep(.v-btn__content) {
   font-family: var(--font-primary);
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  color: #ef4444;
+  font-size: 14px;
+}
+
+.error-message svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 </style>

@@ -28,6 +28,16 @@
         </div>
       </div>
 
+      <!-- Error Message -->
+      <div v-if="errorMessage" class="error-message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>{{ errorMessage }}</span>
+      </div>
+
       <v-form @submit.prevent="handleRegister" class="auth-form">
         <!-- Step 1: Account -->
         <template v-if="currentStep === 1">
@@ -202,8 +212,11 @@ import BackgroundDecoration from '../components/BackgroundDecoration.vue'
 import BrandPanel from '../components/BrandPanel.vue'
 import AuthTabs from '../components/AuthTabs.vue'
 import SocialLogin from '../components/SocialLogin.vue'
+import { api } from '../services/api'
+import { useUserStore } from '../stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const activeTab = ref<'login' | 'register'>('register')
 const currentStep = ref(1)
@@ -220,6 +233,7 @@ const experienceLevel = ref('')
 const agreeTerms = ref(false)
 const agreeNewsletter = ref(true)
 const loading = ref(false)
+const errorMessage = ref('')
 
 const experienceLevels = [
   { text: 'Beginner - Just starting out', value: 'beginner' },
@@ -271,15 +285,43 @@ const passwordStrengthClass = (index: number) => {
 }
 
 const handleRegister = async () => {
+  // Validate passwords match
+  if (password.value !== confirmPassword.value) {
+    errorMessage.value = 'Passwords do not match'
+    return
+  }
+
   loading.value = true
-  await new Promise(resolve => setTimeout(resolve, 1500))
-  loading.value = false
-  console.log('Register:', {
+  errorMessage.value = ''
+
+  const response = await api.auth.register({
     firstName: firstName.value,
     lastName: lastName.value,
     email: email.value,
-    experienceLevel: experienceLevel.value,
+    password: password.value,
+    experienceLevel: experienceLevel.value || undefined,
+    newsletterSubscribed: agreeNewsletter.value,
   })
+
+  loading.value = false
+
+  if (response.error) {
+    errorMessage.value = response.error
+    return
+  }
+
+  if (response.data) {
+    // Set user in store
+    userStore.setUser({
+      id: response.data.id,
+      email: response.data.email,
+      firstName: response.data.firstName,
+      lastName: response.data.lastName,
+    })
+
+    // Redirect to dashboard (or login for now)
+    router.push('/')
+  }
 }
 </script>
 
@@ -288,6 +330,25 @@ const handleRegister = async () => {
   display: flex;
   min-height: 100vh;
   overflow: hidden;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  color: #ef4444;
+  font-size: 14px;
+}
+
+.error-message svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .auth-panel {
