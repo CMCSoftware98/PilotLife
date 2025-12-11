@@ -1,6 +1,0 @@
-@PilotLife.API_HostAddress = http://localhost:5223
-
-GET {{PilotLife.API_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

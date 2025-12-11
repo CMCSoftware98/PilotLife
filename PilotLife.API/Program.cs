@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PilotLife.Database.Data;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +41,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 
     // Auto-migrate database in development
     using var scope = app.Services.CreateScope();
