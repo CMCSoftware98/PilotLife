@@ -19,5 +19,21 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # Optional: Run the API in Docker (uncomment to use)
+  # pilotlife-api:
+  #   build:
+  #     context: ./PilotLife.API
+  #     dockerfile: Dockerfile
+  #   container_name: pilotlife-api
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #     - ConnectionStrings__DefaultConnection=Host=pilotlife-db;Port=5432;Database=pilotlife;Username=pilotlife;Password=pilotlife_dev_password
+  #   ports:
+  #     - "5000:8080"
+  #   depends_on:
+  #     pilotlife-db:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
 volumes:
   pilotlife_postgres_data:
