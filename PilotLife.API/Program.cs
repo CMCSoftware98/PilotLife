@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using PilotLife.API.Data;
+using PilotLife.Database.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 

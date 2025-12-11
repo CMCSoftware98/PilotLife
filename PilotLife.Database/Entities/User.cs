@@ -1,4 +1,4 @@
-namespace PilotLife.API.Entities;
+namespace PilotLife.Database.Entities;
 
 public class User
 {

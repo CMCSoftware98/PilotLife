@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PilotLife.API\PilotLife.API.csproj" />
+  <Project Path="PilotLife.Database\PilotLife.Database.csproj" />
+</Solution>

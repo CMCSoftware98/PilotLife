@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   pilotlife-db:
-    image: postgres:16-alpine
+    image: postgres:18beta1-alpine
     container_name: pilotlife-postgres
     environment:
       POSTGRES_USER: pilotlife

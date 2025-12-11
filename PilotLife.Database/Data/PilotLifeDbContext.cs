@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using PilotLife.API.Entities;
+using PilotLife.Database.Entities;
 
-namespace PilotLife.API.Data;
+namespace PilotLife.Database.Data;
 
 public class PilotLifeDbContext : DbContext
 {
@@ -23,7 +23,8 @@ public class PilotLifeDbContext : DbContext
 
             entity.Property(e => e.Id)
                 .HasColumnName("id")
-                .HasDefaultValueSql("gen_random_uuid()");
+                .HasDefaultValueSql("uuidv7()")
+                .ValueGeneratedOnAdd();
 
             entity.Property(e => e.FirstName)
                 .HasColumnName("first_name")

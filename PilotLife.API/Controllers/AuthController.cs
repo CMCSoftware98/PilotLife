@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using PilotLife.API.Data;
-using PilotLife.API.Entities;
+using PilotLife.Database.Data;
+using PilotLife.Database.Entities;
 using System.Security.Cryptography;
 using System.Text;
 
