@@ -13,6 +13,11 @@ WebSocketServer::WebSocketServer(int port)
             if (msg->type == ix::WebSocketMessageType::Open) {
                 std::cout << "Client connected from: "
                           << connectionState->getRemoteIp() << std::endl;
+
+                // Notify callback of new client connection
+                if (this->m_clientConnectedCallback) {
+                    this->m_clientConnectedCallback(webSocket);
+                }
             }
             else if (msg->type == ix::WebSocketMessageType::Close) {
                 std::cout << "Client disconnected" << std::endl;

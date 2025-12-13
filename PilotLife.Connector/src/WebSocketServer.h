@@ -12,10 +12,13 @@
 #include <string>
 #include <mutex>
 #include <atomic>
+#include <functional>
 #include <iostream>
 
 class WebSocketServer {
 public:
+    using ClientConnectedCallback = std::function<void(ix::WebSocket&)>;
+
     explicit WebSocketServer(int port);
     ~WebSocketServer();
 
@@ -35,9 +38,15 @@ public:
     // Get the port the server is running on
     int getPort() const { return m_port; }
 
+    // Set callback for when a client connects
+    void setClientConnectedCallback(ClientConnectedCallback callback) {
+        m_clientConnectedCallback = callback;
+    }
+
 private:
     int m_port;
     ix::WebSocketServer m_server;
     std::atomic<bool> m_running{false};
     mutable std::mutex m_mutex;
+    ClientConnectedCallback m_clientConnectedCallback;
 };

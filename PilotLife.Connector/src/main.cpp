@@ -90,6 +90,12 @@ int main(int argc, char* argv[]) {
     // Initialize SimConnect manager
     SimConnectManager simConnect;
 
+    // Track current sim status for sending to new clients
+    std::atomic<bool> simIsConnected{false};
+    std::atomic<bool> simIsRunning{false};
+    std::string currentSimVersion;
+    std::mutex simVersionMutex;
+
     // Set up callbacks
     simConnect.setFlightDataCallback([&wsServer](const FlightDataJson& data) {
         std::string json = "{\"type\":\"flightData\",\"data\":" + data.toJson() + "}";
@@ -99,6 +105,19 @@ int main(int argc, char* argv[]) {
     simConnect.setStatusCallback([&wsServer](const SimulatorStatus& status) {
         std::string json = "{\"type\":\"status\",\"data\":" + status.toJson() + "}";
         wsServer.broadcast(json);
+    });
+
+    // When a new client connects, send them the current status
+    wsServer.setClientConnectedCallback([&simIsConnected, &simIsRunning, &currentSimVersion, &simVersionMutex](ix::WebSocket& client) {
+        SimulatorStatus status;
+        status.isConnected = simIsConnected.load();
+        status.isSimRunning = simIsRunning.load();
+        {
+            std::lock_guard<std::mutex> lock(simVersionMutex);
+            status.simulatorVersion = currentSimVersion;
+        }
+        std::string json = "{\"type\":\"status\",\"data\":" + status.toJson() + "}";
+        client.send(json);
     });
 
     // Main loop - detect MSFS process and connect
@@ -122,6 +141,14 @@ int main(int argc, char* argv[]) {
                 wasConnected = true;
                 lastDetectedType = simType;
 
+                // Update tracked state
+                simIsConnected = true;
+                simIsRunning = true;
+                {
+                    std::lock_guard<std::mutex> lock(simVersionMutex);
+                    currentSimVersion = simVersion;
+                }
+
                 // Broadcast connected status
                 SimulatorStatus status;
                 status.isConnected = true;
@@ -137,6 +164,10 @@ int main(int argc, char* argv[]) {
             simConnect.stopDispatchLoop();
             simConnect.disconnect();
             wasConnected = false;
+
+            // Update tracked state
+            simIsConnected = false;
+            simIsRunning = false;
 
             // Broadcast disconnected status
             SimulatorStatus status;

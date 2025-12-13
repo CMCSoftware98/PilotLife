@@ -91,8 +91,9 @@ const simConnected = ref(false)
 const connectorLive = ref(false)
 const showStatusTooltip = ref(false)
 
-// Connector status unsubscribe function
+// Connector status unsubscribe functions
 let unsubscribeStatus: (() => void) | null = null
+let unsubscribeConnection: (() => void) | null = null
 
 const resolutions = [
   { label: 'Small', width: 600, height: 400 },
@@ -176,7 +177,13 @@ onMounted(async () => {
   await appWindow.setSize(new LogicalSize(settings.window.width, settings.window.height))
   currentResolution.value = settings.window.resolutionLabel
 
-  // Subscribe to connector status updates
+  // Subscribe to WebSocket connection status (Connector Live)
+  unsubscribeConnection = connector.onConnection((connected: boolean) => {
+    connectorLive.value = connected
+    console.log('Connector:', connected ? 'Live' : 'Disconnected')
+  })
+
+  // Subscribe to simulator status updates (Sim Connected)
   unsubscribeStatus = connector.onStatus((status: SimulatorStatus) => {
     simConnected.value = status.isConnected && status.isSimRunning
     console.log('Sim status:', status.isConnected ? 'Connected' : 'Disconnected', status.simulatorVersion)
@@ -195,6 +202,10 @@ onUnmounted(async () => {
   document.removeEventListener('click', handleClickOutside)
 
   // Unsubscribe from status updates
+  if (unsubscribeConnection) {
+    unsubscribeConnection()
+    unsubscribeConnection = null
+  }
   if (unsubscribeStatus) {
     unsubscribeStatus()
     unsubscribeStatus = null
@@ -237,6 +248,8 @@ onUnmounted(async () => {
   align-items: center;
   gap: 8px;
   margin-right: 16px;
+  position: relative;
+  cursor: default;
 }
 
 .sim-status-label {
@@ -255,6 +268,59 @@ onUnmounted(async () => {
 }
 
 .sim-status-indicator.connected {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+
+.status-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 160px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.status-row:first-child {
+  padding-top: 0;
+}
+
+.status-row:last-child {
+  padding-bottom: 0;
+}
+
+.status-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.status-indicator.connected {
   background: #22c55e;
   box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
 }

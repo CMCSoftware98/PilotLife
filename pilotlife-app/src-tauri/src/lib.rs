@@ -38,20 +38,35 @@ fn start_connector(state: State<'_, ConnectorState>, app: tauri::AppHandle) -> R
     let port = find_available_port().ok_or("Failed to find available port")?;
 
     // Get the path to the connector executable
-    let resource_path = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+    // In dev mode, use src-tauri/resources; in production, use resource_dir
+    let connector_path = {
+        // Try production path first (resource_dir)
+        let resource_path = app
+            .path()
+            .resource_dir()
+            .map_err(|e| format!("Failed to get resource dir: {}", e))?;
 
-    let connector_path = resource_path.join("PilotLife.Connector.exe");
+        let prod_path = resource_path.join("PilotLife.Connector.exe");
 
-    // Check if the connector exists
-    if !connector_path.exists() {
-        return Err(format!(
-            "Connector not found at: {}",
-            connector_path.display()
-        ));
-    }
+        if prod_path.exists() {
+            prod_path
+        } else {
+            // In dev mode, resources are in src-tauri/resources relative to the manifest dir
+            let dev_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("resources")
+                .join("PilotLife.Connector.exe");
+
+            if dev_path.exists() {
+                dev_path
+            } else {
+                return Err(format!(
+                    "Connector not found at:\n  Production: {}\n  Development: {}",
+                    prod_path.display(),
+                    dev_path.display()
+                ));
+            }
+        }
+    };
 
     // Spawn the connector process with the port argument
     let child = Command::new(&connector_path)
