@@ -13,4 +13,12 @@ public class User
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+
+    // Flight sim properties
+    public int? CurrentAirportId { get; set; }
+    public Airport? CurrentAirport { get; set; }
+    public int? HomeAirportId { get; set; }
+    public Airport? HomeAirport { get; set; }
+    public decimal Balance { get; set; }
+    public int TotalFlightMinutes { get; set; }
 }

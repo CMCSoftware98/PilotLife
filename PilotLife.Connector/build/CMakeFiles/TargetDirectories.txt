@@ -1,0 +1,4 @@
+C:/Users/Callu/RiderProjects/PilotLife/PilotLife.Connector/build/CMakeFiles/PilotLife.Connector.dir
+C:/Users/Callu/RiderProjects/PilotLife/PilotLife.Connector/build/CMakeFiles/INSTALL.dir
+C:/Users/Callu/RiderProjects/PilotLife/PilotLife.Connector/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/Callu/RiderProjects/PilotLife/PilotLife.Connector/build/CMakeFiles/ZERO_CHECK.dir

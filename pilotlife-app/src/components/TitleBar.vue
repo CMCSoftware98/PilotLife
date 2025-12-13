@@ -1,11 +1,21 @@
 <template>
   <div class="titlebar" data-tauri-drag-region>
-    <div class="titlebar-left">
-      <img src="/pilotlife-logo.svg" alt="PilotLife" class="titlebar-logo" />
-    </div>
+    <div class="titlebar-left" data-tauri-drag-region></div>
 
-    <div class="titlebar-center" data-tauri-drag-region>
-      <span class="titlebar-title">PilotLife</span>
+    <div class="sim-status" @mouseenter="showStatusTooltip = true" @mouseleave="showStatusTooltip = false">
+      <span class="sim-status-label">Sim Connected:</span>
+      <span class="sim-status-indicator" :class="{ connected: simConnected }"></span>
+
+      <div v-if="showStatusTooltip" class="status-tooltip">
+        <div class="status-row">
+          <span class="status-label">Connector Live:</span>
+          <span class="status-indicator" :class="{ connected: connectorLive }"></span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Sim Connected:</span>
+          <span class="status-indicator" :class="{ connected: simConnected }"></span>
+        </div>
+      </div>
     </div>
 
     <div class="titlebar-controls">
@@ -37,6 +47,12 @@
         </div>
       </div>
 
+      <button class="titlebar-btn minimize" @click="minimize" title="Minimize">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14" />
+        </svg>
+      </button>
+
       <button class="titlebar-btn close" @click="close" title="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M6 6l12 12M6 18L18 6" />
@@ -49,10 +65,34 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
+import { readTextFile, writeTextFile, exists, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs'
+import { connector, type SimulatorStatus } from '@/services/connector'
+
+interface AppSettings {
+  window: {
+    width: number
+    height: number
+    resolutionLabel: string
+  }
+}
+
+const defaultSettings: AppSettings = {
+  window: {
+    width: 800,
+    height: 600,
+    resolutionLabel: 'Medium'
+  }
+}
 
 const appWindow = getCurrentWindow()
 const showSettings = ref(false)
 const currentResolution = ref('800 x 600')
+const simConnected = ref(false)
+const connectorLive = ref(false)
+const showStatusTooltip = ref(false)
+
+// Connector status unsubscribe function
+let unsubscribeStatus: (() => void) | null = null
 
 const resolutions = [
   { label: 'Small', width: 600, height: 400 },
@@ -62,6 +102,41 @@ const resolutions = [
   { label: 'Full HD', width: 1920, height: 1080 }
 ]
 
+const SETTINGS_DIR = 'settings'
+const SETTINGS_FILE = 'settings/settings.json'
+const fsOptions = { baseDir: BaseDirectory.Resource }
+
+async function loadSettings(): Promise<AppSettings> {
+  try {
+    const fileExists = await exists(SETTINGS_FILE, fsOptions)
+    console.log('Settings file exists:', fileExists)
+    if (!fileExists) {
+      console.log('Using default settings')
+      return defaultSettings
+    }
+    const content = await readTextFile(SETTINGS_FILE, fsOptions)
+    console.log('Loaded settings:', content)
+    return JSON.parse(content) as AppSettings
+  } catch (error) {
+    console.error('Failed to load settings:', error)
+    return defaultSettings
+  }
+}
+
+async function saveSettings(settings: AppSettings): Promise<void> {
+  try {
+    // Ensure settings directory exists
+    const dirExists = await exists(SETTINGS_DIR, fsOptions)
+    if (!dirExists) {
+      await mkdir(SETTINGS_DIR, { ...fsOptions, recursive: true })
+    }
+    await writeTextFile(SETTINGS_FILE, JSON.stringify(settings, null, 2), fsOptions)
+    console.log('Settings saved successfully:', settings)
+  } catch (error) {
+    console.error('Failed to save settings:', error)
+  }
+}
+
 function toggleSettings() {
   showSettings.value = !showSettings.value
 }
@@ -70,6 +145,15 @@ async function setResolution(width: number, height: number, label: string) {
   await appWindow.setSize(new LogicalSize(width, height))
   currentResolution.value = label
   showSettings.value = false
+
+  // Save to settings file
+  const settings = await loadSettings()
+  settings.window = { width, height, resolutionLabel: label }
+  await saveSettings(settings)
+}
+
+async function minimize() {
+  await appWindow.minimize()
 }
 
 async function close() {
@@ -87,18 +171,42 @@ function handleClickOutside(event: MouseEvent) {
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
 
-  // Get current size and set the label
-  const size = await appWindow.innerSize()
-  const match = resolutions.find(r => r.width === size.width && r.height === size.height)
-  if (match) {
-    currentResolution.value = match.label
-  } else {
-    currentResolution.value = `${size.width} x ${size.height}`
+  // Load settings and apply saved window size
+  const settings = await loadSettings()
+  await appWindow.setSize(new LogicalSize(settings.window.width, settings.window.height))
+  currentResolution.value = settings.window.resolutionLabel
+
+  // Subscribe to connector status updates
+  unsubscribeStatus = connector.onStatus((status: SimulatorStatus) => {
+    simConnected.value = status.isConnected && status.isSimRunning
+    console.log('Sim status:', status.isConnected ? 'Connected' : 'Disconnected', status.simulatorVersion)
+  })
+
+  // Start the connector
+  try {
+    await connector.start()
+    console.log('Connector started on port:', connector.getPort())
+  } catch (error) {
+    console.error('Failed to start connector:', error)
   }
 })
 
-onUnmounted(() => {
+onUnmounted(async () => {
   document.removeEventListener('click', handleClickOutside)
+
+  // Unsubscribe from status updates
+  if (unsubscribeStatus) {
+    unsubscribeStatus()
+    unsubscribeStatus = null
+  }
+
+  // Stop the connector
+  try {
+    await connector.stop()
+    console.log('Connector stopped')
+  } catch (error) {
+    console.error('Failed to stop connector:', error)
+  }
 })
 </script>
 
@@ -121,28 +229,34 @@ onUnmounted(() => {
 }
 
 .titlebar-left {
+  flex: 1;
+}
+
+.sim-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 120px;
+  margin-right: 16px;
 }
 
-.titlebar-logo {
-  height: 20px;
-  width: auto;
-}
-
-.titlebar-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-}
-
-.titlebar-title {
-  font-size: 13px;
-  font-weight: 500;
+.sim-status-label {
+  font-size: 12px;
   color: var(--text-secondary);
-  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.sim-status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+  transition: all 0.3s ease;
+}
+
+.sim-status-indicator.connected {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
 }
 
 .titlebar-controls {

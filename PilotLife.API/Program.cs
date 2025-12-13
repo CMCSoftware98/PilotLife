@@ -1,4 +1,8 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using PilotLife.API.Services;
 using PilotLife.Database.Data;
 using Scalar.AspNetCore;
 
@@ -9,7 +13,6 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 // Configure database connection
-// Check if custom connection should be used
 var useCustomConnection = builder.Configuration.GetValue<bool>("Database:UseCustomConnection");
 var connectionString = useCustomConnection
     ? builder.Configuration.GetValue<string>("Database:CustomConnectionString")
@@ -23,6 +26,34 @@ if (string.IsNullOrEmpty(connectionString))
 builder.Services.AddDbContext<PilotLifeDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+// Configure JWT
+var jwtSettings = new JwtSettings();
+builder.Configuration.GetSection("Jwt").Bind(jwtSettings);
+builder.Services.AddSingleton(jwtSettings);
+builder.Services.AddSingleton<IJwtService, JwtService>();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidAudience = jwtSettings.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddAuthorization();
+
 // Add CORS for Tauri app
 builder.Services.AddCors(options =>
 {
@@ -34,6 +65,9 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
+
+// Register services
+builder.Services.AddSingleton<AirportImportService>();
 
 var app = builder.Build();
 
@@ -47,10 +81,18 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
     await dbContext.Database.MigrateAsync();
+
+    // Import airports from CSV if not already imported
+    var airportImportService = app.Services.GetRequiredService<AirportImportService>();
+    await airportImportService.ImportAirportsAsync();
 }
 
 app.UseHttpsRedirection();
 app.UseCors("TauriApp");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();

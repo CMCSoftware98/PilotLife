@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\build\CMakeFiles\18407c1abea963c7603e22a8f37a0b0b\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{C8DA6CB9-A7F8-3773-A185-214DE4933E33}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -22,7 +22,151 @@ namespace PilotLife.Database.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("PilotLife.Database.Entities.User", b =>
+            modelBuilder.Entity("PilotLife.Database.Entities.Airport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("country");
+
+                    b.Property<int?>("ElevationFt")
+                        .HasColumnType("integer")
+                        .HasColumnName("elevation_ft");
+
+                    b.Property<string>("IataCode")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("iata_code");
+
+                    b.Property<string>("Ident")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("ident");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude");
+
+                    b.Property<string>("Municipality")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("municipality");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IataCode");
+
+                    b.HasIndex("Ident")
+                        .IsUnique();
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("airports", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Database.Entities.Job", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("uuidv7()");
+
+                    b.Property<int>("ArrivalAirportId")
+                        .HasColumnType("integer")
+                        .HasColumnName("arrival_airport_id");
+
+                    b.Property<Guid?>("AssignedToUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_to_user_id");
+
+                    b.Property<string>("CargoType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("cargo_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("DepartureAirportId")
+                        .HasColumnType("integer")
+                        .HasColumnName("departure_airport_id");
+
+                    b.Property<double>("DistanceNm")
+                        .HasColumnType("double precision")
+                        .HasColumnName("distance_nm");
+
+                    b.Property<int>("EstimatedFlightTimeMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("estimated_flight_time_minutes");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<bool>("IsCompleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_completed");
+
+                    b.Property<decimal>("Payout")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("payout");
+
+                    b.Property<string>("RequiredAircraftType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("required_aircraft_type");
+
+                    b.Property<int>("Weight")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArrivalAirportId");
+
+                    b.HasIndex("AssignedToUserId");
+
+                    b.HasIndex("DepartureAirportId");
+
+                    b.HasIndex("IsCompleted");
+
+                    b.ToTable("jobs", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Database.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -35,6 +179,61 @@ namespace PilotLife.Database.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("ReplacedByToken")
+                        .HasColumnType("text")
+                        .HasColumnName("replaced_by_token");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("refresh_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Database.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("uuidv7()");
+
+                    b.Property<decimal>("Balance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("balance");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int?>("CurrentAirportId")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_airport_id");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -59,6 +258,10 @@ namespace PilotLife.Database.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("first_name");
 
+                    b.Property<int?>("HomeAirportId")
+                        .HasColumnType("integer")
+                        .HasColumnName("home_airport_id");
+
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
@@ -80,16 +283,80 @@ namespace PilotLife.Database.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
+                    b.Property<int>("TotalFlightMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("total_flight_minutes");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CurrentAirportId");
+
                     b.HasIndex("Email")
                         .IsUnique();
 
+                    b.HasIndex("HomeAirportId");
+
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Database.Entities.Job", b =>
+                {
+                    b.HasOne("PilotLife.Database.Entities.Airport", "ArrivalAirport")
+                        .WithMany()
+                        .HasForeignKey("ArrivalAirportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Database.Entities.User", "AssignedToUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PilotLife.Database.Entities.Airport", "DepartureAirport")
+                        .WithMany()
+                        .HasForeignKey("DepartureAirportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ArrivalAirport");
+
+                    b.Navigation("AssignedToUser");
+
+                    b.Navigation("DepartureAirport");
+                });
+
+            modelBuilder.Entity("PilotLife.Database.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("PilotLife.Database.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PilotLife.Database.Entities.User", b =>
+                {
+                    b.HasOne("PilotLife.Database.Entities.Airport", "CurrentAirport")
+                        .WithMany()
+                        .HasForeignKey("CurrentAirportId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PilotLife.Database.Entities.Airport", "HomeAirport")
+                        .WithMany()
+                        .HasForeignKey("HomeAirportId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CurrentAirport");
+
+                    b.Navigation("HomeAirport");
                 });
 #pragma warning restore 612, 618
         }

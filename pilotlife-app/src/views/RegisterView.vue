@@ -311,16 +311,11 @@ const handleRegister = async () => {
   }
 
   if (response.data) {
-    // Set user in store
-    userStore.setUser({
-      id: response.data.id,
-      email: response.data.email,
-      firstName: response.data.firstName,
-      lastName: response.data.lastName,
-    })
+    // Set user in store from auth response
+    userStore.setUserFromAuthResponse(response.data)
 
-    // Redirect to dashboard (or login for now)
-    router.push('/')
+    // Redirect to dashboard
+    router.push('/dashboard')
   }
 }
 </script>

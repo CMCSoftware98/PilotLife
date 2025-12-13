@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\SimConnectManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\ProcessDetector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\WebSocketServer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\FlightData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\SimConnectManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\ProcessDetector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\WebSocketServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\FlightData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{64D1181F-D537-3176-AA84-F733D2152055}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{1A0F1006-2EE8-396E-89D0-3C4DEC30EAFE}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

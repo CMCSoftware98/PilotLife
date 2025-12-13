@@ -116,14 +116,8 @@ const handleLogin = async () => {
   }
 
   if (response.data) {
-    userStore.setUser({
-      id: response.data.id,
-      email: response.data.email,
-      firstName: response.data.firstName,
-      lastName: response.data.lastName,
-      experienceLevel: response.data.experienceLevel,
-    })
-    router.push('/')
+    userStore.setUserFromAuthResponse(response.data)
+    router.push('/dashboard')
   }
 }
 </script>
