@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PilotLife.API.Services;
+using PilotLife.Application.FlightTracking;
 using PilotLife.Database.Data;
 using Scalar.AspNetCore;
 
@@ -68,6 +69,7 @@ builder.Services.AddCors(options =>
 
 // Register services
 builder.Services.AddSingleton<AirportImportService>();
+builder.Services.AddScoped<IFlightTrackingService, FlightTrackingService>();
 
 var app = builder.Build();
 

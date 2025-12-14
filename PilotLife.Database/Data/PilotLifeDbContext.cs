@@ -468,4 +468,296 @@ public class PilotLifeDbContext : DbContext
             entity.HasIndex(e => e.AircraftTitle);
         });
     }
+
+    private static void ConfigureTrackedFlight(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TrackedFlight>(entity =>
+        {
+            entity.ToTable("tracked_flights");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id")
+                .IsRequired();
+
+            entity.Property(e => e.State)
+                .HasColumnName("state")
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(e => e.AircraftId)
+                .HasColumnName("aircraft_id");
+
+            entity.Property(e => e.AircraftTitle)
+                .HasColumnName("aircraft_title")
+                .HasMaxLength(256);
+
+            entity.Property(e => e.AircraftIcaoType)
+                .HasColumnName("aircraft_icao_type")
+                .HasMaxLength(10);
+
+            entity.Property(e => e.DepartureAirportId)
+                .HasColumnName("departure_airport_id");
+
+            entity.Property(e => e.DepartureIcao)
+                .HasColumnName("departure_icao")
+                .HasMaxLength(10);
+
+            entity.Property(e => e.DepartureTime)
+                .HasColumnName("departure_time")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.ArrivalAirportId)
+                .HasColumnName("arrival_airport_id");
+
+            entity.Property(e => e.ArrivalIcao)
+                .HasColumnName("arrival_icao")
+                .HasMaxLength(10);
+
+            entity.Property(e => e.ArrivalTime)
+                .HasColumnName("arrival_time")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.CurrentLatitude)
+                .HasColumnName("current_latitude");
+
+            entity.Property(e => e.CurrentLongitude)
+                .HasColumnName("current_longitude");
+
+            entity.Property(e => e.CurrentAltitude)
+                .HasColumnName("current_altitude");
+
+            entity.Property(e => e.CurrentHeading)
+                .HasColumnName("current_heading");
+
+            entity.Property(e => e.CurrentGroundSpeed)
+                .HasColumnName("current_ground_speed");
+
+            entity.Property(e => e.LastPositionUpdate)
+                .HasColumnName("last_position_update")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.FlightTimeMinutes)
+                .HasColumnName("flight_time_minutes");
+
+            entity.Property(e => e.DistanceNm)
+                .HasColumnName("distance_nm");
+
+            entity.Property(e => e.MaxAltitude)
+                .HasColumnName("max_altitude");
+
+            entity.Property(e => e.MaxGroundSpeed)
+                .HasColumnName("max_ground_speed");
+
+            entity.Property(e => e.HardLandingCount)
+                .HasColumnName("hard_landing_count");
+
+            entity.Property(e => e.OverspeedCount)
+                .HasColumnName("overspeed_count");
+
+            entity.Property(e => e.StallWarningCount)
+                .HasColumnName("stall_warning_count");
+
+            entity.Property(e => e.LandingRate)
+                .HasColumnName("landing_rate");
+
+            entity.Property(e => e.FuelUsedGallons)
+                .HasColumnName("fuel_used_gallons");
+
+            entity.Property(e => e.StartFuelGallons)
+                .HasColumnName("start_fuel_gallons");
+
+            entity.Property(e => e.EndFuelGallons)
+                .HasColumnName("end_fuel_gallons");
+
+            entity.Property(e => e.PayloadWeightLbs)
+                .HasColumnName("payload_weight_lbs");
+
+            entity.Property(e => e.TotalWeightLbs)
+                .HasColumnName("total_weight_lbs");
+
+            entity.Property(e => e.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.ConnectorSessionId)
+                .HasColumnName("connector_session_id")
+                .HasMaxLength(100);
+
+            // Relationships
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Aircraft)
+                .WithMany()
+                .HasForeignKey(e => e.AircraftId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.DepartureAirport)
+                .WithMany()
+                .HasForeignKey(e => e.DepartureAirportId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.ArrivalAirport)
+                .WithMany()
+                .HasForeignKey(e => e.ArrivalAirportId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.Financials)
+                .WithOne(f => f.TrackedFlight)
+                .HasForeignKey<FlightFinancials>(f => f.TrackedFlightId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.State);
+            entity.HasIndex(e => e.ConnectorSessionId);
+            entity.HasIndex(e => new { e.UserId, e.State });
+        });
+    }
+
+    private static void ConfigureFlightJob(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FlightJob>(entity =>
+        {
+            entity.ToTable("flight_jobs");
+
+            entity.Property(e => e.TrackedFlightId)
+                .HasColumnName("tracked_flight_id")
+                .IsRequired();
+
+            entity.Property(e => e.JobId)
+                .HasColumnName("job_id")
+                .IsRequired();
+
+            entity.Property(e => e.IsCompleted)
+                .HasColumnName("is_completed")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IsFailed)
+                .HasColumnName("is_failed")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.FailureReason)
+                .HasColumnName("failure_reason")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.ActualPayout)
+                .HasColumnName("actual_payout")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.XpEarned)
+                .HasColumnName("xp_earned");
+
+            entity.Property(e => e.ReputationChange)
+                .HasColumnName("reputation_change");
+
+            // Relationships
+            entity.HasOne(e => e.TrackedFlight)
+                .WithMany(f => f.FlightJobs)
+                .HasForeignKey(e => e.TrackedFlightId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Job)
+                .WithMany()
+                .HasForeignKey(e => e.JobId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Indexes
+            entity.HasIndex(e => e.TrackedFlightId);
+            entity.HasIndex(e => e.JobId);
+            entity.HasIndex(e => new { e.TrackedFlightId, e.JobId }).IsUnique();
+        });
+    }
+
+    private static void ConfigureFlightFinancials(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FlightFinancials>(entity =>
+        {
+            entity.ToTable("flight_financials");
+
+            entity.Property(e => e.TrackedFlightId)
+                .HasColumnName("tracked_flight_id")
+                .IsRequired();
+
+            // Revenue
+            entity.Property(e => e.JobRevenue)
+                .HasColumnName("job_revenue")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.OnTimeBonus)
+                .HasColumnName("on_time_bonus")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.LandingBonus)
+                .HasColumnName("landing_bonus")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.FuelEfficiencyBonus)
+                .HasColumnName("fuel_efficiency_bonus")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.OtherBonuses)
+                .HasColumnName("other_bonuses")
+                .HasPrecision(18, 2);
+
+            // Costs
+            entity.Property(e => e.FuelCost)
+                .HasColumnName("fuel_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.LandingFees)
+                .HasColumnName("landing_fees")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.HandlingFees)
+                .HasColumnName("handling_fees")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.NavigationFees)
+                .HasColumnName("navigation_fees")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.MaintenanceCost)
+                .HasColumnName("maintenance_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.InsuranceCost)
+                .HasColumnName("insurance_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.CrewCost)
+                .HasColumnName("crew_cost")
+                .HasPrecision(18, 2);
+
+            // Penalties
+            entity.Property(e => e.LatePenalty)
+                .HasColumnName("late_penalty")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.DamagePenalty)
+                .HasColumnName("damage_penalty")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.IncidentPenalty)
+                .HasColumnName("incident_penalty")
+                .HasPrecision(18, 2);
+
+            // Ignore computed properties (not stored in DB)
+            entity.Ignore(e => e.TotalRevenue);
+            entity.Ignore(e => e.TotalCosts);
+            entity.Ignore(e => e.TotalPenalties);
+            entity.Ignore(e => e.NetProfit);
+            entity.Ignore(e => e.IsProfitable);
+
+            // Indexes
+            entity.HasIndex(e => e.TrackedFlightId).IsUnique();
+        });
+    }
 }
