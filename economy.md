@@ -68,7 +68,9 @@ Players can join multiple worlds, each with isolated progress. A player's User a
 **Per-World Entities (Isolated per world, all have WorldId):**
 - PlayerWorld - Player's state in specific world
 - OwnedAircraft, AircraftComponent, AircraftModification, MaintenanceLog
-- Job, FlightJob
+- **AircraftRentalListing** - Player aircraft available for rent
+- **RentalTransaction** - Rental history and payouts
+- Job, FlightJob, **QuickJob** - Including rental jobs
 - UserLicense
 - LicenseExam, ExamManeuver, ExamCheckpoint - Practical flight exams
 - Loan, LoanPayment, CreditScoreEvent
@@ -326,6 +328,761 @@ Entity: FlightPlan
 
 ---
 
+## Connector Weight & Fuel Management
+
+### Overview
+The connector can read AND write aircraft weight and fuel states via SimConnect SDK. This enables automatic fuel loading and cargo placement when players accept jobs.
+
+### SimConnect Variables Used
+
+**Fuel Tanks (Read/Write):**
+```cpp
+// Fuel quantities in gallons
+FUEL_TANK_LEFT_MAIN_QUANTITY
+FUEL_TANK_RIGHT_MAIN_QUANTITY
+FUEL_TANK_CENTER_QUANTITY
+FUEL_TANK_LEFT_AUX_QUANTITY
+FUEL_TANK_RIGHT_AUX_QUANTITY
+FUEL_TANK_EXTERNAL1_QUANTITY
+FUEL_TANK_EXTERNAL2_QUANTITY
+
+// Total fuel
+FUEL_TOTAL_QUANTITY_WEIGHT  // lbs
+```
+
+**Payload Stations (Read/Write):**
+```cpp
+// Payload weights in lbs
+PAYLOAD_STATION_WEIGHT:1   // Pilot
+PAYLOAD_STATION_WEIGHT:2   // Co-pilot/Passenger
+PAYLOAD_STATION_WEIGHT:3   // Rear passengers
+PAYLOAD_STATION_WEIGHT:4   // Baggage/Cargo
+// ... varies by aircraft
+```
+
+**Aircraft Limits (Read):**
+```cpp
+DESIGN_SPEED_VS0          // Stall speed
+MAX_GROSS_WEIGHT          // MTOW
+EMPTY_WEIGHT              // OEW
+TOTAL_WEIGHT              // Current weight
+CG_PERCENT                // Center of gravity
+```
+
+### Auto-Fill Feature
+
+When a player accepts a job and clicks "Auto-Fill", the system:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    AUTO-FILL CALCULATION                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. FUEL CALCULATION                                            │
+│     ├── Route distance: 250nm                                   │
+│     ├── Fuel burn rate: 12 gal/hr (from aircraft template)      │
+│     ├── Estimated flight time: 1.5 hrs                          │
+│     ├── Trip fuel: 18 gal                                       │
+│     ├── Alternate fuel (+45 min): 9 gal                         │
+│     ├── Reserve (+30 min): 6 gal                                │
+│     ├── Contingency (+10%): 3.3 gal                             │
+│     └── TOTAL FUEL REQUIRED: 36.3 gal                           │
+│                                                                 │
+│  2. PAYLOAD CALCULATION                                         │
+│     ├── Cargo weight: 450 lbs                                   │
+│     ├── Pilot weight: 180 lbs (configurable)                    │
+│     └── Distribute to payload stations                          │
+│                                                                 │
+│  3. WEIGHT CHECK                                                │
+│     ├── Empty weight: 1,670 lbs                                 │
+│     ├── Fuel weight: 218 lbs (36.3 gal × 6 lbs)                 │
+│     ├── Payload: 630 lbs                                        │
+│     ├── Total: 2,518 lbs                                        │
+│     ├── MTOW: 2,550 lbs                                         │
+│     └── ✓ WITHIN LIMITS                                         │
+│                                                                 │
+│  4. FUEL COST                                                   │
+│     ├── Current fuel: 10 gal                                    │
+│     ├── Fuel to add: 26.3 gal                                   │
+│     ├── Price at EGLL: $7.50/gal (AVGAS)                        │
+│     └── FUEL COST: $197.25                                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Auto-Fill Flow
+
+```
+1. Player in Web App:
+   ├── Accepts job (cargo: 450 lbs, EGLL → EGCC)
+   ├── Clicks "Auto-Fill Aircraft"
+   └── Confirms fuel purchase ($197.25)
+
+2. API Processing:
+   ├── Calculate fuel requirements
+   ├── Check aircraft limits (MTOW, fuel capacity)
+   ├── Deduct fuel cost from player balance
+   ├── Record fuel purchase at airport
+   └── Send payload config to connector
+
+3. Connector (SimConnect):
+   ├── Receive auto-fill command
+   ├── Set fuel tank quantities
+   ├── Set payload station weights
+   └── Confirm completion to API
+
+4. Player sees:
+   └── Aircraft loaded, ready to fly
+```
+
+### Connector Auto-Fill Implementation
+
+```cpp
+struct AutoFillCommand {
+    // Fuel (gallons per tank)
+    float leftMainFuel;
+    float rightMainFuel;
+    float centerFuel;
+    float leftAuxFuel;
+    float rightAuxFuel;
+
+    // Payload (lbs per station)
+    std::vector<float> payloadStations;
+
+    // Validation
+    float expectedTotalWeight;
+    float mtow;
+};
+
+class FuelPayloadManager {
+public:
+    bool executeAutoFill(const AutoFillCommand& cmd) {
+        // Validate within limits
+        if (cmd.expectedTotalWeight > cmd.mtow) {
+            return false; // Overweight
+        }
+
+        // Set fuel tanks via SimConnect
+        SimConnect_SetDataOnSimObject(
+            hSimConnect,
+            FUEL_TANK_LEFT_MAIN,
+            SIMCONNECT_OBJECT_ID_USER,
+            0, 0, sizeof(float), &cmd.leftMainFuel
+        );
+        // ... repeat for other tanks
+
+        // Set payload stations
+        for (int i = 0; i < cmd.payloadStations.size(); i++) {
+            SimConnect_SetDataOnSimObject(
+                hSimConnect,
+                PAYLOAD_STATION_BASE + i,
+                SIMCONNECT_OBJECT_ID_USER,
+                0, 0, sizeof(float), &cmd.payloadStations[i]
+            );
+        }
+
+        return true;
+    }
+
+    AircraftWeights getCurrentWeights() {
+        // Read current state from sim
+        AircraftWeights weights;
+        // ... SimConnect read operations
+        return weights;
+    }
+};
+```
+
+### Manual vs Auto-Fill
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| Auto-Fill | System calculates and loads | Quick start, optimal fuel |
+| Manual | Player sets own fuel/cargo | Custom planning, tankering |
+| Partial | Auto cargo, manual fuel | Experienced players |
+
+### Weight Tracking During Flight
+
+```cpp
+// Connector monitors weight throughout flight
+struct FlightWeightLog {
+    float takeoffWeight;
+    float landingWeight;
+    float fuelUsed;
+    float cargoDelivered;
+
+    // For fuel efficiency stats
+    float fuelEfficiencyNmPerGal;
+};
+```
+
+---
+
+## Airport Fuel System
+
+### Overview
+Airports store and sell fuel. Different airports have different fuel types, prices, and daily supply limits. Players must plan fuel stops strategically.
+
+### Fuel Types
+
+| Type | Aircraft | Density | Color |
+|------|----------|---------|-------|
+| AVGAS 100LL | Piston engines | 6.0 lbs/gal | Blue |
+| Jet-A1 | Turboprops, Jets | 6.7 lbs/gal | Clear/Straw |
+
+### Daily Fuel Supply by Airport Size
+
+| Airport Size | Examples | AVGAS/day | Jet-A/day | Refill Rate |
+|--------------|----------|-----------|-----------|-------------|
+| Grass Strip | Farm strips, private | 500 gal | 0 | 100 gal/hr |
+| Small Paved | Local airports | 2,000 gal | 1,500 gal | 250 gal/hr |
+| Medium | Regional airports | 15,000 gal | 40,000 gal | 2,000 gal/hr |
+| Large Hub | Major airports | Unlimited | Unlimited | N/A |
+| Player-Owned | Varies | Set by owner | Set by owner | Based on upgrades |
+
+### Fuel Pricing (Base Rates)
+
+| Location Type | AVGAS/gal | Jet-A/gal |
+|---------------|-----------|-----------|
+| Major Hub | $6.00 | $4.50 |
+| Regional Airport | $7.00 | $5.50 |
+| Small Airport | $8.00 | $6.50 |
+| Remote/Island | $10.00 | $8.50 |
+| Player-Owned | $5.00-$15.00 | $4.00-$12.00 |
+
+**Price Modifiers:**
+- High demand (>80% daily usage): +20%
+- Low supply (<20% remaining): +30%
+- World difficulty: × modifier
+- Remote location bonus: +25-50%
+- Player-owned markup: Set by owner
+
+### Fuel Purchase Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 FUEL PURCHASE - EGLL                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Aircraft: Cessna 172 (N12345)                                  │
+│  Current Fuel: 12.5 gal / 56 gal capacity                       │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  AVGAS 100LL                                            │    │
+│  │  Price: $6.50/gal                                       │    │
+│  │  Available: 1,847 gal (of 2,000 daily)                  │    │
+│  │                                                         │    │
+│  │  [Fill to ____] gal    or    [Top Off (43.5 gal)]       │    │
+│  │                                                         │    │
+│  │  Cost: $282.75                                          │    │
+│  │                                                         │    │
+│  │  [ ] Auto-fill to aircraft via connector                │    │
+│  │                                                         │    │
+│  │  [Purchase Fuel]                                        │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│  💡 Tip: EGGP has cheaper fuel ($6.20/gal) - 150nm away         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Fuel Exhaustion Scenarios
+
+When an airport runs low on fuel:
+
+```
+Low Supply (<500 gal remaining):
+├── Warning shown to players
+├── Price increases +30%
+├── Max purchase limited to 50 gal per aircraft
+└── Refill countdown displayed
+
+Out of Stock (0 gal):
+├── "NO FUEL AVAILABLE" displayed
+├── Players must plan alternate fuel stops
+├── Creates strategic gameplay
+└── Refills over time based on airport rate
+```
+
+### Airport Fuel Entity
+
+```csharp
+public class AirportFuelStock
+{
+    public Guid Id { get; set; }
+    public Guid WorldId { get; set; }
+    public string AirportIcao { get; set; }
+
+    // Current stock
+    public decimal AvgasQuantityGal { get; set; }
+    public decimal JetAQuantityGal { get; set; }
+
+    // Daily limits
+    public decimal AvgasDailyCapacityGal { get; set; }
+    public decimal JetADailyCapacityGal { get; set; }
+
+    // Refill rates (gal per real hour)
+    public decimal AvgasRefillRatePerHour { get; set; }
+    public decimal JetARefillRatePerHour { get; set; }
+
+    // Pricing
+    public decimal AvgasPricePerGal { get; set; }
+    public decimal JetAPricePerGal { get; set; }
+
+    // Ownership (null = system-owned)
+    public Guid? OwnerPlayerWorldId { get; set; }
+    public decimal? OwnerFuelMarkup { get; set; }  // 0-100% markup
+
+    public DateTime LastRefillAt { get; set; }
+    public DateTime LastUpdatedAt { get; set; }
+}
+
+public class FuelPurchase
+{
+    public Guid Id { get; set; }
+    public Guid WorldId { get; set; }
+    public Guid PlayerWorldId { get; set; }
+    public string AirportIcao { get; set; }
+
+    public FuelType FuelType { get; set; }
+    public decimal QuantityGal { get; set; }
+    public decimal PricePerGal { get; set; }
+    public decimal TotalCost { get; set; }
+
+    public Guid? AircraftId { get; set; }  // If loaded directly
+    public bool AutoFilled { get; set; }
+
+    // Revenue split (if player-owned airport)
+    public Guid? AirportOwnerId { get; set; }
+    public decimal? OwnerRevenue { get; set; }
+
+    public DateTime PurchasedAt { get; set; }
+}
+
+public enum FuelType { Avgas100LL, JetA1 }
+```
+
+### Strategic Fuel Planning
+
+Players should consider:
+- **Tankering**: Buy cheap fuel, carry extra to avoid expensive stops
+- **Fuel Stops**: Plan routes through affordable fuel airports
+- **Reserve Airports**: Know which airports have fuel for emergencies
+- **Player-Owned Savings**: Frequent your own airport for cheaper fuel
+
+---
+
+## Player-Owned Airports
+
+### Overview
+Players can purchase airports to earn passive income from landing fees, fuel sales, and services. Airport ownership creates a player-driven economy layer.
+
+### Buyable Airport Types
+
+| Type | Examples | Price Range | Landing Traffic |
+|------|----------|-------------|-----------------|
+| Grass Strip | Farm fields, private | $50,000 - $250,000 | Low |
+| Small Paved | Local GA airports | $250,000 - $1,500,000 | Low-Medium |
+| Medium Regional | Regional hubs | $2,000,000 - $15,000,000 | Medium-High |
+| Small Island | Remote destinations | $500,000 - $3,000,000 | Low (premium) |
+
+**NOT Buyable:** Major international hubs (system-owned to ensure availability)
+
+### Airport Purchase Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              AIRPORT FOR SALE: EGBJ (Gloucestershire)           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Type: Small Paved Regional                                     │
+│  Runway: 09/27 - 4,500ft asphalt                                │
+│  Location: Gloucestershire, England                             │
+│                                                                 │
+│  📊 TRAFFIC STATS (Last 30 game days):                          │
+│  ├── Total landings: 847                                        │
+│  ├── Average per day: 28                                        │
+│  ├── Aircraft mix: 65% light, 25% twin, 10% turboprop           │
+│  └── Fuel sold: 12,400 gal AVGAS, 3,200 gal Jet-A               │
+│                                                                 │
+│  💰 ESTIMATED MONTHLY REVENUE:                                  │
+│  ├── Landing fees: $18,500                                      │
+│  ├── Fuel profit: $8,200                                        │
+│  ├── Operating costs: -$5,000                                   │
+│  └── NET PROFIT: ~$21,700/month                                 │
+│                                                                 │
+│  🏷️ ASKING PRICE: $850,000                                      │
+│                                                                 │
+│  [ Purchase Outright ]  [ Finance (20% down) ]                  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Revenue Streams
+
+**1. Landing Fees**
+| Aircraft Class | Default Fee | Owner Can Set |
+|----------------|-------------|---------------|
+| Light Single (<6,000 lbs) | $50 | $25 - $300 |
+| Light Twin (<12,000 lbs) | $100 | $50 - $500 |
+| Turboprop (<20,000 lbs) | $300 | $150 - $1,500 |
+| Regional Jet (<50,000 lbs) | $800 | $400 - $3,000 |
+| Narrow Body (<180,000 lbs) | $2,000 | $1,000 - $8,000 |
+| Wide Body (>180,000 lbs) | $5,000 | $2,500 - $15,000 |
+
+**2. Fuel Sales**
+- Owner sets markup: 0-100% above base cost
+- Base cost is wholesale price (owner pays this)
+- Profit = (Sell price - Base cost) × gallons sold
+
+**3. Parking Fees (Optional)**
+| Duration | Default | Owner Can Set |
+|----------|---------|---------------|
+| Per hour | $10 | $5 - $50 |
+| Per day | $50 | $25 - $200 |
+| Per week | $200 | $100 - $800 |
+
+### Operating Costs
+
+| Airport Type | Monthly Maintenance | Staff (Optional) | Fuel Storage |
+|--------------|--------------------|--------------------|--------------|
+| Grass Strip | $500 | $1,000 | $200 |
+| Small Paved | $2,000 | $3,000 | $500 |
+| Medium Regional | $8,000 | $12,000 | $2,000 |
+| Small Island | $3,000 | $2,000 | $1,000 |
+
+### Airport Upgrades
+
+Owners can invest to improve their airport:
+
+| Upgrade | Cost | Benefit |
+|---------|------|---------|
+| Larger Fuel Storage | $25,000-$100,000 | +50-200% daily fuel capacity |
+| Faster Fuel Trucks | $50,000 | +100% refill rate |
+| Better Runway | $100,000-$500,000 | Attract larger aircraft |
+| Lighting (Night Ops) | $75,000 | Allow night landings |
+| ILS/Approach Aids | $200,000 | Attract IFR traffic |
+| Hangar Space | $50,000-$200,000 | Parking revenue, storage |
+| FBO Services | $150,000 | Premium fees, pilot amenities |
+
+### Competitive Dynamics
+
+**Pricing Strategy:**
+- Set fees too high → pilots avoid your airport
+- Set fees too low → less profit per landing
+- Balance with local competition
+
+**Fuel Competition:**
+```
+EGBJ (Player A): AVGAS $7.00/gal
+EGBK (Player B): AVGAS $6.50/gal (25nm away)
+EGBB (System): AVGAS $6.80/gal (40nm away)
+
+→ Pilots factor fuel price + distance into route planning
+```
+
+### Airport Entity
+
+```csharp
+public class OwnedAirport
+{
+    public Guid Id { get; set; }
+    public Guid WorldId { get; set; }
+    public string AirportIcao { get; set; }
+
+    // Ownership
+    public Guid OwnerPlayerWorldId { get; set; }
+    public PlayerWorld Owner { get; set; }
+    public decimal PurchasePrice { get; set; }
+    public DateTime PurchasedAt { get; set; }
+
+    // Fee settings
+    public decimal LandingFeeLightSingle { get; set; }
+    public decimal LandingFeeLightTwin { get; set; }
+    public decimal LandingFeeTurboprop { get; set; }
+    public decimal LandingFeeRegionalJet { get; set; }
+    public decimal LandingFeeNarrowBody { get; set; }
+    public decimal LandingFeeWideBody { get; set; }
+
+    // Fuel settings
+    public decimal AvgasMarkupPercent { get; set; }  // 0-100
+    public decimal JetAMarkupPercent { get; set; }
+
+    // Parking
+    public decimal ParkingFeePerHour { get; set; }
+    public decimal ParkingFeePerDay { get; set; }
+
+    // Upgrades
+    public bool HasNightLighting { get; set; }
+    public bool HasILS { get; set; }
+    public bool HasFBO { get; set; }
+    public int FuelStorageLevel { get; set; }  // 1-3
+    public int HangarCapacity { get; set; }
+
+    // Stats
+    public int TotalLandings { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public DateTime LastLandingAt { get; set; }
+}
+
+public class LandingFeeTransaction
+{
+    public Guid Id { get; set; }
+    public Guid WorldId { get; set; }
+    public Guid PilotPlayerWorldId { get; set; }
+    public Guid? AirportOwnerId { get; set; }
+    public string AirportIcao { get; set; }
+
+    public string AircraftType { get; set; }
+    public decimal AircraftWeightLbs { get; set; }
+    public decimal FeeAmount { get; set; }
+
+    public decimal OwnerRevenue { get; set; }  // 90% typically
+    public decimal PlatformFee { get; set; }   // 10% to system
+
+    public DateTime LandedAt { get; set; }
+}
+```
+
+### Landing Fee Integration with Connector
+
+```cpp
+// Connector reports landing to API
+struct LandingReport {
+    string arrivalIcao;
+    string aircraftType;
+    float landingWeightLbs;
+    DateTime landingTime;
+
+    // API returns
+    decimal landingFee;
+    string airportOwner;  // null if system-owned
+};
+
+// Fee automatically deducted from pilot's balance
+// Owner credited (minus platform fee)
+```
+
+### Player Considerations When Flying
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  ROUTE PLANNING: EGLL → EGCC                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Direct Route: 160nm                                            │
+│                                                                 │
+│  DESTINATION OPTIONS:                                           │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ EGCC (Manchester)          - System Owned                │    │
+│  │   Landing Fee: $150 (turboprop)                         │    │
+│  │   Fuel: $5.80/gal Jet-A                                 │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │ EGNM (Leeds Bradford)      - Player: SkyKing_Pete       │    │
+│  │   Landing Fee: $200 (turboprop) ⚠️ Higher               │    │
+│  │   Fuel: $5.20/gal Jet-A ✓ Cheaper                       │    │
+│  │   Distance: +15nm                                        │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │ EGNH (Blackpool)           - Player: AviatorJane        │    │
+│  │   Landing Fee: $120 (turboprop) ✓ Cheapest              │    │
+│  │   Fuel: $6.00/gal Jet-A                                 │    │
+│  │   Distance: +25nm                                        │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│  💡 Consider: Landing at EGNH saves $30 in fees but uses       │
+│     more fuel (+$15). Net savings: ~$15                         │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Starter Loan Program
+
+### Overview
+New players can access a special starter loan after obtaining their CPL to purchase their first aircraft. This enables aircraft ownership within the first 2 hours of gameplay.
+
+### The First 2 Hours Problem
+
+**Without Starter Loan:**
+```
+Hour 0:   Start with $50,000
+Hour 1:   CPL obtained, $42,500 remaining
+Hour 1-2: Quick Jobs earning ~$8,000-$12,000/flight
+          Need 15-20 flights to afford $150,000 aircraft
+          That's 10+ hours of gameplay!
+```
+
+**With Starter Loan:**
+```
+Hour 0:   Start with $50,000
+Hour 1:   CPL obtained, $42,500 remaining
+Hour 1-2: 3-4 Quick Jobs, earn ~$35,000
+          Total: ~$77,500
+          Apply for Starter Loan: $172,500
+          Buy used Cessna 172: $250,000
+          OWN FIRST AIRCRAFT! ✓
+```
+
+### Starter Loan Terms
+
+| Feature | Starter Loan | Regular Loan |
+|---------|--------------|--------------|
+| Eligibility | CPL obtained, < $100k net worth | Credit score based |
+| Max Amount | $250,000 | Based on credit |
+| Interest Rate | 1.5% per game month | 2-8% per game month |
+| Term | 6-12 game months | 1-24 game months |
+| Down Payment | 0% | 5-25% |
+| Collateral | Aircraft purchased | Varies |
+| Approval | Instant | Credit check |
+| Limit | Once per world | Unlimited |
+
+### Starter Loan Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              🎓 STARTER LOAN PROGRAM                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Congratulations on earning your CPL!                           │
+│                                                                 │
+│  You qualify for our Starter Loan Program - designed to help    │
+│  new commercial pilots purchase their first aircraft.           │
+│                                                                 │
+│  YOUR ELIGIBILITY:                                              │
+│  ✓ CPL License obtained                                         │
+│  ✓ Net worth under $100,000 ($77,500 current)                   │
+│  ✓ First loan in this world                                     │
+│                                                                 │
+│  STARTER LOAN TERMS:                                            │
+│  ├── Maximum amount: $250,000                                   │
+│  ├── Interest rate: 1.5% per game month                         │
+│  ├── Term options: 6, 9, or 12 game months                      │
+│  ├── Down payment: $0 required                                  │
+│  └── Collateral: Aircraft purchased with loan                   │
+│                                                                 │
+│  💡 With your $77,500 + $250,000 loan, you can afford:          │
+│     • Used Cessna 152 ($150,000) - keep $177,500 reserve        │
+│     • Used Cessna 172 ($220,000) - keep $107,500 reserve        │
+│     • Used Piper PA-28 ($200,000) - keep $127,500 reserve       │
+│                                                                 │
+│  [Apply for Starter Loan]                                       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### First Aircraft Options
+
+| Aircraft | Price (Used) | Cargo Capacity | Range | Earnings/Flight |
+|----------|--------------|----------------|-------|-----------------|
+| Cessna 150/152 | $120,000-$160,000 | 200 lbs | 400nm | $6,000-$8,000 |
+| Cessna 172 | $180,000-$280,000 | 400 lbs | 600nm | $8,000-$12,000 |
+| Piper PA-28 | $160,000-$240,000 | 350 lbs | 500nm | $7,000-$10,000 |
+| Beechcraft Musketeer | $140,000-$200,000 | 300 lbs | 550nm | $7,000-$9,000 |
+
+### Loan Repayment Schedule
+
+**Example: $172,500 loan for Cessna 172**
+
+| Term | Monthly Payment | Total Interest | Total Repayment |
+|------|-----------------|----------------|-----------------|
+| 6 months | $29,831 | $6,488 | $178,988 |
+| 9 months | $20,182 | $9,138 | $181,638 |
+| 12 months | $15,349 | $11,688 | $184,188 |
+
+**Can You Afford It?**
+```
+Monthly payment (12 mo): $15,349
+Flights per game month needed: ~2 flights
+(At $8,000 profit per flight)
+
+Very manageable! Most players fly 10+ flights per game month.
+```
+
+### Alternative: Rental-Only Path
+
+Some players may prefer to avoid loans:
+
+```
+RENTAL PATH TO OWNERSHIP:
+
+Hour 0-1:   CPL obtained ($42,500)
+Hour 1-5:   Quick Jobs only
+            20 flights × $9,000 avg profit = $180,000
+            Total: $222,500
+Hour 5-6:   Buy first aircraft outright ($200,000)
+            No debt, $22,500 reserve
+
+Pros: No interest, no monthly payments
+Cons: Takes 5-6 hours instead of 2 hours
+      Lower profit per flight (rental cut)
+```
+
+### Starter Loan Entity
+
+```csharp
+public class StarterLoan
+{
+    public Guid Id { get; set; }
+    public Guid WorldId { get; set; }
+    public Guid PlayerWorldId { get; set; }
+
+    // Loan details
+    public decimal Amount { get; set; }
+    public decimal InterestRatePerMonth { get; set; }  // 0.015 = 1.5%
+    public int TermMonths { get; set; }
+    public decimal MonthlyPayment { get; set; }
+
+    // Collateral
+    public Guid PurchasedAircraftId { get; set; }
+
+    // Status
+    public LoanStatus Status { get; set; }
+    public int PaymentsMade { get; set; }
+    public decimal RemainingBalance { get; set; }
+    public DateTime NextPaymentDue { get; set; }
+
+    public DateTime ApprovedAt { get; set; }
+    public DateTime? PaidOffAt { get; set; }
+}
+```
+
+### Two Paths to Aircraft Ownership
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                PATH TO YOUR FIRST AIRCRAFT                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   PATH A: STARTER LOAN (Fast Track)          ⏱️ ~2 hours        │
+│   ────────────────────────────────────                          │
+│   1. Complete Discovery + PPL + CPL                             │
+│   2. Do 3-4 Quick Jobs to build capital                         │
+│   3. Apply for Starter Loan ($250k max)                         │
+│   4. Buy your first aircraft!                                   │
+│   5. Pay off loan while flying your own plane                   │
+│                                                                 │
+│   ✓ Own aircraft in 2 hours                                     │
+│   ✓ Higher profit per flight (no rental cut)                    │
+│   ✗ Monthly loan payments                                       │
+│                                                                 │
+│   ─────────────────── OR ───────────────────                    │
+│                                                                 │
+│   PATH B: RENTAL SAVINGS (Debt-Free)         ⏱️ ~6 hours        │
+│   ────────────────────────────────────                          │
+│   1. Complete Discovery + PPL + CPL                             │
+│   2. Continue Quick Jobs with rentals                           │
+│   3. Save up full aircraft purchase price                       │
+│   4. Buy aircraft outright - no debt!                           │
+│                                                                 │
+│   ✓ No debt or monthly payments                                 │
+│   ✓ Full profit immediately after purchase                      │
+│   ✗ Takes longer to own aircraft                                │
+│   ✗ Lower profit while renting (20%+ cut)                       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Flight Restrictions & Enforcement
 
 ### Overview
@@ -473,25 +1230,250 @@ POST /api/worlds/{worldId}/transport/request    - Pay and transport player
 
 ---
 
+## Quick Jobs & Aircraft Rental System
+
+### Overview
+New players can start earning money immediately through "Quick Jobs" - jobs that include aircraft rental. This allows players to take commercial flights without owning an aircraft, paying a rental fee that's deducted from the job payout.
+
+### Rental Sources
+
+**1. System Fleet (Always Available)**
+- Standard aircraft at major airports
+- Higher rental percentage (system takes larger cut)
+- Guaranteed availability
+- Basic insurance included
+- No relationship building needed
+
+**2. Player Fleet (Passive Income)**
+- Other players list their aircraft for rent
+- Owner sets rental percentage (within limits)
+- Owner earns passive income when aircraft is rented
+- Aircraft gains flight hours and wear
+- Owner responsible for maintenance
+
+### Rental Fee Structure (% of Job Payout)
+
+| Aircraft Class | System Rental | Player Rental Range | Min Player Rate |
+|----------------|---------------|---------------------|-----------------|
+| Light Single (C172, PA28) | 20% | 10-25% | 10% |
+| Light Twin (C421, PA34) | 25% | 15-30% | 15% |
+| Turboprop Single (TBM, PC-12) | 28% | 18-35% | 18% |
+| Turboprop Twin (King Air) | 30% | 20-35% | 20% |
+| Regional Jet (CRJ, E-Jets) | 35% | 25-40% | 25% |
+| Narrow Body (A320, B737) | 38% | 28-45% | 28% |
+| Wide Body (A350, B777) | 40% | 30-50% | 30% |
+
+### Quick Job Flow
+
+```
+1. Player browses available jobs
+2. Player selects job (doesn't own suitable aircraft)
+3. System shows "Quick Job" option with available rentals:
+   ┌─────────────────────────────────────────────────────┐
+   │  QUICK JOB: Cargo to EGCC                          │
+   │  Job Payout: $12,000                               │
+   │                                                     │
+   │  Available Rentals at EGLL:                        │
+   │  ┌─────────────────────────────────────────────┐   │
+   │  │ [SYSTEM] Cessna 172 - 20% ($2,400)          │   │
+   │  │          Your Profit: $9,600                │   │
+   │  ├─────────────────────────────────────────────┤   │
+   │  │ [PLAYER] JohnDoe's PA-28 - 15% ($1,800)     │   │
+   │  │          Your Profit: $10,200               │   │
+   │  └─────────────────────────────────────────────┘   │
+   └─────────────────────────────────────────────────────┘
+4. Player selects rental and accepts job
+5. Player flies and completes job
+6. Payout distributed automatically:
+   - Rental fee → owner (system or player)
+   - Insurance fee → system (if applicable)
+   - Remainder → pilot
+```
+
+### Rental Payout Distribution
+
+**System Rental Example:**
+```
+Job Payout:        $12,000
+System Rental:     -$2,400 (20%) → System
+Insurance:         -$200 (flat fee)
+─────────────────────────────
+Pilot Profit:      $9,400
+```
+
+**Player Rental Example:**
+```
+Job Payout:        $12,000
+Owner Rental:      -$1,800 (15%) → Aircraft Owner
+Platform Fee:      -$180 (10% of rental) → System
+Insurance:         -$150 (lower for player rentals)
+─────────────────────────────
+Pilot Profit:      $9,870
+Owner Profit:      $1,620 (after platform fee)
+```
+
+### Aircraft Rental Listing (For Owners)
+
+Players can list their aircraft for rent:
+```csharp
+public class AircraftRentalListing
+{
+    public Guid Id { get; set; }
+    public Guid OwnedAircraftId { get; set; }
+    public Guid WorldId { get; set; }
+
+    public decimal RentalPercentage { get; set; }  // 10-50%
+    public bool IsActive { get; set; }
+
+    // Restrictions
+    public int? MinimumPilotRating { get; set; }  // Reputation score
+    public bool RequireCPL { get; set; }
+    public bool AllowInternational { get; set; }
+
+    // Stats
+    public int TotalRentals { get; set; }
+    public decimal TotalEarnings { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+```
+
+### Rental Insurance
+
+| Coverage | Cost | Covers |
+|----------|------|--------|
+| Basic (System) | $200/job | Damage up to $50k |
+| Standard (Player) | $150/job | Damage up to $25k |
+| Premium | $500/job | Full replacement value |
+
+**Damage Responsibility:**
+- Hard landings, minor incidents: Insurance covers
+- Pilot negligence (gear-up landing): Pilot pays deductible
+- Total loss: Insurance + pilot deductible (10% of value, max $50k)
+
+### Why Quick Jobs?
+
+**For New Players:**
+- Start earning immediately after getting CPL
+- Learn different aircraft before buying
+- Build reputation and capital
+- No upfront aircraft investment
+
+**For Aircraft Owners:**
+- Passive income while not flying
+- Aircraft stays active (good for economy)
+- Builds fleet utilization stats
+- Can set restrictions on who rents
+
+---
+
 ## License Exam System
 
 ### Overview
 Players must pass practical flight exams to earn licenses. Exams are started from the web app and tracked by the connector.
 
-### Exam Types
+### Design Goal: CPL in ~1 Hour
 
-| Exam | Prerequisites | Duration | Aircraft | Key Requirements |
-|------|--------------|----------|----------|------------------|
-| SPL | None | 30 min | Any single | 3 takeoffs/landings, basic maneuvers |
-| PPL | SPL | 60 min | Single piston | Navigation, emergencies, landings |
-| CPL | PPL | 90 min | Complex single | Commercial maneuvers, precision |
-| ATPL | CPL | 120 min | Multi-engine | Airline procedures, multi-crew |
-| Night Rating | PPL | 45 min | Any | 5 night landings, navigation |
-| IR | PPL | 90 min | IFR equipped | Approaches, holds, navigation |
-| MEP | PPL | 60 min | Twin piston | Engine-out procedures |
-| Type Rating | CPL or ATPL | 60-120 min | Specific type | Multi-airport circuit, touch-and-go's |
+A skilled player should be able to progress from zero to CPL (Commercial Pilot License) in approximately **1 hour of gameplay**. This allows new players to quickly start taking paid jobs and earning money.
 
-**No Hour Requirements**: If you can afford the exam fee and pass the practical test, you earn the license. Skill > time logged.
+**Fast Track to Commercial Operations:**
+```
+Discovery Flight (10 min) → PPL Exam (25 min) → CPL Exam (30 min)
+Total: ~65 minutes of flight time
+```
+
+### Exam Qualification Path
+
+```
+                              ┌─────────────────────┐
+                              │   START (New Player) │
+                              └──────────┬──────────┘
+                                         │
+                                         ▼
+                    ┌────────────────────────────────────────┐
+                    │     DISCOVERY FLIGHT (10 min, $500)    │
+                    │   Basic: Takeoff, fly, navigate, land  │
+                    │         ✓ Pass → Unlocks PPL           │
+                    └──────────────────┬─────────────────────┘
+                                       │
+                                       ▼
+                    ┌────────────────────────────────────────┐
+                    │       PPL EXAM (25 min, $2,000)        │
+                    │   Maneuvers, navigation, 3 landings    │
+                    │     ✓ Pass → Unlocks everything below  │
+                    └──────────────────┬─────────────────────┘
+                                       │
+           ┌───────────────┬───────────┼───────────┬─────────────────┐
+           │               │           │           │                 │
+           ▼               ▼           ▼           ▼                 ▼
+    ┌─────────────┐ ┌─────────────┐ ┌─────────┐ ┌─────────┐  ┌──────────────┐
+    │ CPL EXAM    │ │NIGHT RATING │ │ IR EXAM │ │MEP EXAM │  │ BASIC TYPE   │
+    │ (30 min)    │ │ (30 min)    │ │ (45 min)│ │ (45 min)│  │ RATINGS      │
+    │ $5,000      │ │ $3,000      │ │ $5,000  │ │ $4,000  │  │ (SEP only)   │
+    └──────┬──────┘ └─────────────┘ └────┬────┘ └────┬────┘  └──────────────┘
+           │                              │          │
+           │         ┌────────────────────┴──────────┘
+           │         │
+           ▼         ▼
+    ┌─────────────────────────────────────────────────────┐
+    │              TYPE RATINGS (45-90 min)               │
+    │       Requires: CPL (or ATPL for airline types)     │
+    │    Multi-airport circuit with touch-and-go's        │
+    └──────────────────────────┬──────────────────────────┘
+                               │
+                               │ (Requires: CPL + IR + MEP)
+                               ▼
+                    ┌─────────────────────────────────────┐
+                    │      ATPL EXAM (90 min, $10,000)    │
+                    │    Multi-crew, airline procedures   │
+                    │    ✓ Pass → Airline operations      │
+                    └─────────────────────────────────────┘
+```
+
+### Exam Types (Updated for Fast Progression)
+
+| Exam | Prerequisites | Duration | Cost | Unlocks |
+|------|--------------|----------|------|---------|
+| Discovery Flight | None | 10 min | $500 | PPL Exam |
+| PPL | Discovery Flight ✓ | 25 min | $2,000 | CPL, Night, IR, MEP, Basic Types |
+| Night Rating | PPL | 30 min | $3,000 | Night flying, night jobs |
+| IR (Instrument) | PPL | 45 min | $5,000 | IFR flight, IFR jobs, ATPL |
+| MEP (Multi-Engine) | PPL | 45 min | $4,000 | Multi-engine aircraft, ATPL |
+| CPL | PPL | 30 min | $5,000 | Commercial jobs, Type Ratings |
+| Type Rating | CPL (or ATPL) | 45-90 min | $5k-$20k | Specific aircraft operation |
+| ATPL | CPL + IR + MEP | 90 min | $10,000 | Airline operations |
+
+**No Hour Requirements**: Skill > time logged. Pass the practical test = earn the license.
+
+### Discovery Flight (New Player Entry Point)
+
+The Discovery Flight is designed to get new players into the action quickly while ensuring they have basic aircraft control.
+
+**Requirements:**
+- Duration: 10 minutes
+- Aircraft: Any single-engine piston
+- Cost: $500
+
+**Tasks:**
+1. Start at designated airport
+2. Takeoff and climb to 2,000ft AGL
+3. Fly to waypoint (5-10nm away)
+4. Perform one 360° turn
+5. Return to airport
+6. Land safely
+
+**Scoring:**
+- Takeoff: 15 points
+- Navigation: 20 points
+- Turn (maintain altitude ±200ft): 15 points
+- Return navigation: 20 points
+- Landing: 30 points
+- **Pass: 70/100**
+
+**Why Discovery Flight?**
+- Proves basic competency before PPL
+- Quick filter for complete beginners
+- Low cost, low risk entry point
+- Unlocks the full exam system
 
 ### Scoring System
 
@@ -858,14 +1840,32 @@ struct ManeuverDetector {
 ```
 
 ### Exam Fees (Base, × World Modifier)
-| Exam | Fee | Retake |
-|------|-----|--------|
-| SPL | $500 | $250 |
-| PPL | $2,000 | $1,000 |
-| CPL | $5,000 | $2,500 |
-| ATPL | $10,000 | $5,000 |
-| Night/IR/MEP | $3,000 | $1,500 |
-| Type Rating | $5,000-$20,000 | 50% |
+| Exam | Fee | Retake (First) | Retake (Second+) |
+|------|-----|----------------|------------------|
+| Discovery Flight | $500 | $250 | $375 |
+| PPL | $2,000 | $1,000 | $1,500-$3,000 |
+| CPL | $5,000 | $2,500 | $3,750-$7,500 |
+| ATPL | $10,000 | $5,000 | $7,500-$15,000 |
+| Night Rating | $3,000 | $1,500 | $2,250-$4,500 |
+| IR | $5,000 | $2,500 | $3,750-$7,500 |
+| MEP | $4,000 | $2,000 | $3,000-$6,000 |
+| Type Rating | $5,000-$20,000 | 50% | 75%-150% |
+
+### New Player Progression Cost Summary
+
+**Minimum Cost to CPL (Fast Track):**
+```
+Discovery Flight:  $500
+PPL Exam:          $2,000
+CPL Exam:          $5,000
+────────────────────────
+Total:             $7,500 (assuming first-time passes)
+```
+
+**Starting Capital vs Requirements:**
+- Starting Capital (Medium): $50,000
+- Cost to CPL: $7,500
+- Remaining after CPL: $42,500 (plenty for first aircraft down payment or rental jobs)
 
 ---
 
@@ -1225,24 +2225,48 @@ CATEGORY_MULTIPLIER: Single Piston(0.25), Twin Piston(0.40), Turboprop(0.85), Na
 
 ## Phase 3: License System (Game Time Adjusted)
 
-### License Validity (Game Months)
-| License | Price | Validity | Renewal |
-|---------|-------|----------|---------|
-| SPL | $2,500 | Until PPL | N/A |
-| PPL | $12,000 | 6 months | $3,000 |
-| CPL | $35,000 | 3 months | $8,000 |
-| ATPL | $75,000 | 3 months | $15,000 |
-| SEP/MEP | $5,000/$12,000 | 6 months | $1,500/$4,000 |
-| IR | $18,000 | 3 months | $5,000 |
-| Type Ratings | $25k-$150k | 3 months | 25% of cost |
-| DG License | $15,000 | 6 months | $5,000 |
+### License Validity & Costs (Updated for Fast Progression)
+
+**Core Licenses (Exam Required):**
+| License | Exam Cost | Validity | Renewal |
+|---------|-----------|----------|---------|
+| Discovery | $500 | Permanent | N/A (one-time qualification) |
+| PPL | $2,000 | 6 game months | $500 |
+| CPL | $5,000 | 3 game months | $1,500 |
+| ATPL | $10,000 | 3 game months | $3,000 |
+
+**Endorsements (Exam Required):**
+| Rating | Exam Cost | Validity | Renewal |
+|--------|-----------|----------|---------|
+| Night Rating | $3,000 | 6 game months | $1,000 |
+| IR (Instrument) | $5,000 | 3 game months | $1,500 |
+| MEP (Multi-Engine) | $4,000 | 6 game months | $1,200 |
+| Type Ratings | $5k-$20k | 3 game months | 25% of cost |
+| DG (Dangerous Goods) | $2,000 | 6 game months | $600 |
+
+### Fast Track Summary
+
+**Time to CPL (Skilled Player):**
+```
+Discovery Flight:  10 min  │  $500
+PPL Exam:          25 min  │  $2,000
+CPL Exam:          30 min  │  $5,000
+──────────────────────────────────────
+Total:             65 min  │  $7,500
+```
+
+**After CPL, player can:**
+- Take commercial jobs (with Quick Job rentals)
+- Start earning $8,000-$12,000+ per flight
+- Save for first aircraft purchase
+- Add endorsements (Night, IR, MEP) as needed
 
 ### License Shop Features
 - View all available licenses with prerequisites
-- Check if player qualifies
-- Purchase with instant or exam-required options
-- Renewal reminders before expiry
-- Bulk discounts for multiple ratings
+- **Qualification status** shown (Discovery ✓, PPL exam unlocked, etc.)
+- Real-time exam scheduling
+- Renewal reminders (7 game days before expiry)
+- Bulk discounts for multiple ratings (10% off 2+, 20% off 4+)
 
 ---
 
@@ -1480,7 +2504,14 @@ PilotLife.Database/Entities/
 │   ├── OwnedAircraft.cs
 │   ├── AircraftComponent.cs
 │   ├── AircraftModification.cs
-│   └── MaintenanceLog.cs
+│   ├── MaintenanceLog.cs
+│   ├── AircraftRentalListing.cs
+│   └── RentalTransaction.cs
+├── Airports/
+│   ├── OwnedAirport.cs
+│   ├── AirportFuelStock.cs
+│   ├── FuelPurchase.cs
+│   └── LandingFeeTransaction.cs
 ├── Cargo/
 │   ├── CargoCategory.cs
 │   ├── CargoSubcategory.cs
@@ -1523,14 +2554,27 @@ PilotLife.API/Services/
 ├── World/
 │   ├── WorldService.cs
 │   └── WorldSettingsService.cs
-├── AircraftPricingService.cs
-├── MaintenanceService.cs
-├── JobGenerationService.cs
-├── JobCompletionService.cs
-├── LicenseService.cs
-├── ExamService.cs
-├── LoanService.cs
-├── CreditScoreService.cs
+├── Aircraft/
+│   ├── AircraftPricingService.cs
+│   ├── AircraftRentalService.cs
+│   ├── FuelPayloadService.cs        # Auto-fill calculations
+│   └── MaintenanceService.cs
+├── Airports/
+│   ├── AirportOwnershipService.cs
+│   ├── FuelStockService.cs
+│   ├── LandingFeeService.cs
+│   └── AirportUpgradeService.cs
+├── Jobs/
+│   ├── JobGenerationService.cs
+│   ├── JobCompletionService.cs
+│   └── QuickJobService.cs
+├── Licenses/
+│   ├── LicenseService.cs
+│   └── ExamService.cs
+├── Banking/
+│   ├── LoanService.cs
+│   ├── StarterLoanService.cs
+│   └── CreditScoreService.cs
 ├── MarketplaceService.cs
 ├── AuctionService.cs
 ├── AIFlightService.cs
@@ -1543,16 +2587,23 @@ PilotLife.API/Controllers/
 ├── WorldsController.cs
 ├── IAMController.cs (admin)
 ├── ExamsController.cs
+├── RentalsController.cs (aircraft rental listings)
+├── QuickJobsController.cs (browse/accept quick jobs)
+├── AirportsController.cs (owned airports, fuel, landing fees)
+├── FuelController.cs (fuel purchases, auto-fill)
+├── StarterLoanController.cs (first aircraft financing)
 ├── ConnectorController.cs (flight tracking API)
 └── ... (existing controllers)
 
 PilotLife.Connector/ (C++ Updates)
 ├── src/
-│   ├── JobTracker.cpp/h        # Job state management
-│   ├── ExamTracker.cpp/h       # Exam flight monitoring
-│   ├── ManeuverDetector.cpp/h  # Maneuver grading
-│   ├── FlightState.cpp/h       # State machine
-│   └── ApiClient.cpp/h         # REST client updates
+│   ├── JobTracker.cpp/h           # Job state management
+│   ├── ExamTracker.cpp/h          # Exam flight monitoring
+│   ├── ManeuverDetector.cpp/h     # Maneuver grading
+│   ├── FlightState.cpp/h          # State machine
+│   ├── FuelPayloadManager.cpp/h   # Auto-fill, weight/fuel read/write
+│   ├── LandingReporter.cpp/h      # Landing fee integration
+│   └── ApiClient.cpp/h            # REST client updates
 ```
 
 ---
@@ -1563,13 +2614,23 @@ PilotLife.Connector/ (C++ Updates)
 |--------|----------|
 | Game Time | 1 game month = 7 real days |
 | Multi-World | Isolated economies, starting with "Global" |
+| **Fast Progression** | **CPL in ~1 hour (Discovery 10min → PPL 25min → CPL 30min)** |
+| **First Aircraft** | **~2 hours with Starter Loan ($250k, 1.5%/mo, 0% down)** |
+| **Quick Jobs** | **Rental-based jobs for players without aircraft (20-40% cut)** |
 | Aircraft Pricing | Real-world based formula |
 | Earnings | High ($8k-$8M per flight based on aircraft) |
+| **Fuel System** | **Finite daily supply at airports, AVGAS + Jet-A, variable pricing** |
+| **Auto-Fill** | **Connector sets fuel/payload via SimConnect on player request** |
+| **Player Airports** | **Buy airports ($50k-$15M), earn landing fees + fuel markup** |
+| **Landing Fees** | **Charged on every landing, goes to airport owner (90%)** |
 | Loans | 1-24 game months, simple monthly interest |
+| **Starter Loan** | **$250k max, 1.5%/mo, 0% down, CPL required, once per world** |
 | Licenses | Expiring, 3-6 game months validity, NO hour requirements |
 | License Exams | Practical flight tests tracked by connector (skill-based, not time-gated) |
+| **Exam Prerequisites** | **Discovery → PPL → (CPL/Night/IR/MEP parallel) → ATPL** |
 | Jobs | Dynamic, expiring, multi-job flights |
 | Job Completion | Connector validates departure/arrival airports |
+| **Aircraft Rentals** | **System fleet + player fleet, passive income for owners** |
 | AI Crew | Passive income via simulated flights |
 | Auctions | Player-to-player with escrow |
 | Detection | Hybrid (base + behavior modifiers) |
@@ -1592,6 +2653,72 @@ POST   /api/connector/flight/complete   - Flight completed, process jobs
 POST   /api/connector/exam/start        - Begin exam
 POST   /api/connector/exam/maneuver     - Report maneuver result
 POST   /api/connector/exam/complete     - Submit exam results
+```
+
+---
+
+## Quick Jobs & Rental API Endpoints
+
+```
+# Quick Jobs
+GET    /api/worlds/{worldId}/quick-jobs              - List available quick jobs (with rentals)
+GET    /api/worlds/{worldId}/quick-jobs/{jobId}      - Get quick job details + rental options
+POST   /api/worlds/{worldId}/quick-jobs/{jobId}/accept - Accept quick job with rental selection
+
+# Aircraft Rentals (Owner management)
+GET    /api/worlds/{worldId}/my-rentals              - List my aircraft rental listings
+POST   /api/worlds/{worldId}/my-rentals              - Create rental listing for owned aircraft
+PUT    /api/worlds/{worldId}/my-rentals/{id}         - Update rental settings (%, restrictions)
+DELETE /api/worlds/{worldId}/my-rentals/{id}         - Remove aircraft from rental pool
+GET    /api/worlds/{worldId}/my-rentals/earnings     - View rental income history
+
+# Rental Browse (For renters)
+GET    /api/worlds/{worldId}/rentals/available       - Browse available rentals at location
+GET    /api/worlds/{worldId}/rentals/{icao}          - Rentals at specific airport
+```
+
+---
+
+## Fuel & Airport API Endpoints
+
+```
+# Fuel System
+GET    /api/worlds/{worldId}/fuel/{icao}             - Get fuel availability/prices at airport
+GET    /api/worlds/{worldId}/fuel/{icao}/history     - Fuel price history
+POST   /api/worlds/{worldId}/fuel/purchase           - Purchase fuel
+POST   /api/worlds/{worldId}/fuel/auto-fill          - Calculate and request auto-fill
+
+# Auto-Fill (Connector integration)
+POST   /api/connector/auto-fill/calculate            - Calculate fuel/payload for route
+POST   /api/connector/auto-fill/execute              - Execute auto-fill on aircraft
+GET    /api/connector/aircraft/weights               - Get current aircraft weights
+
+# Player-Owned Airports
+GET    /api/worlds/{worldId}/airports/for-sale       - Browse airports available for purchase
+GET    /api/worlds/{worldId}/airports/{icao}         - Get airport details (fees, fuel, owner)
+POST   /api/worlds/{worldId}/airports/{icao}/purchase - Buy an airport
+GET    /api/worlds/{worldId}/my-airports             - List my owned airports
+PUT    /api/worlds/{worldId}/my-airports/{icao}/fees - Update landing fees
+PUT    /api/worlds/{worldId}/my-airports/{icao}/fuel - Update fuel markup
+POST   /api/worlds/{worldId}/my-airports/{icao}/upgrade - Purchase airport upgrade
+GET    /api/worlds/{worldId}/my-airports/{icao}/revenue - View revenue dashboard
+
+# Landing Fees (automatic via connector, but viewable)
+GET    /api/worlds/{worldId}/landing-fees/history    - My landing fee payments
+GET    /api/worlds/{worldId}/landing-fees/earnings   - My airport landing fee earnings
+```
+
+---
+
+## Starter Loan API Endpoints
+
+```
+# Starter Loan Program
+GET    /api/worlds/{worldId}/starter-loan/eligibility  - Check if player qualifies
+GET    /api/worlds/{worldId}/starter-loan/terms        - View loan terms and options
+POST   /api/worlds/{worldId}/starter-loan/apply        - Apply for starter loan
+GET    /api/worlds/{worldId}/starter-loan/status       - View current loan status
+POST   /api/worlds/{worldId}/starter-loan/payment      - Make extra payment
 ```
 
 ---
