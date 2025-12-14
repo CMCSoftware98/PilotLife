@@ -5,6 +5,8 @@
 1. [Development Philosophy](#development-philosophy)
 2. [Architecture Principles](#architecture-principles)
 3. [.NET Development Standards](#net-development-standards)
+   - [Date & Time Handling](#date--time-handling)
+   - [Identifier Standards (UUID v7)](#identifier-standards-uuid-v7)
 4. [TypeScript & Vue Standards](#typescript--vue-standards)
 5. [Testing Standards](#testing-standards)
 6. [Database & Query Efficiency](#database--query-efficiency)
@@ -494,6 +496,122 @@ builder.Services.AddControllers()
   "expiresAt": "2024-01-16T14:30:00+00:00"
 }
 ```
+
+### Identifier Standards (UUID v7)
+
+**All entity IDs MUST use UUID v7 (UUIDv7) instead of UUID v4.**
+
+UUID v7 provides time-ordered identifiers that dramatically improve database performance and enable timestamp extraction directly from the ID.
+
+**Why UUID v7:**
+
+| Aspect | UUID v4 | UUID v7 |
+|--------|---------|---------|
+| Ordering | Random, non-sequential | Time-ordered, sequential |
+| Index Performance | Causes fragmentation | Minimal fragmentation |
+| Sortability | Non-sortable | Chronologically sortable |
+| Timestamp | None | Embedded (extractable) |
+
+**Generation (.NET 9+):**
+
+```csharp
+// Generate UUID v7 - uses current UTC time
+var id = Guid.CreateVersion7();
+
+// With custom timestamp
+var id = Guid.CreateVersion7(DateTimeOffset.UtcNow);
+```
+
+**Timestamp Extraction:**
+
+```csharp
+public static class GuidExtensions
+{
+    /// <summary>
+    /// Extracts the timestamp from a UUID v7 identifier.
+    /// Returns the DateTimeOffset when the UUID was created.
+    /// </summary>
+    public static DateTimeOffset GetTimestamp(this Guid uuid)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        uuid.TryWriteBytes(bytes);
+
+        // UUID v7: First 48 bits are Unix timestamp in milliseconds
+        // Guid.TryWriteBytes uses big-endian for the first 8 bytes
+        long timestampMs = ((long)bytes[0] << 40) |
+                          ((long)bytes[1] << 32) |
+                          ((long)bytes[2] << 24) |
+                          ((long)bytes[3] << 16) |
+                          ((long)bytes[4] << 8) |
+                          bytes[5];
+
+        return DateTimeOffset.FromUnixTimeMilliseconds(timestampMs);
+    }
+
+    /// <summary>
+    /// Validates that a GUID is UUID version 7.
+    /// </summary>
+    public static bool IsVersion7(this Guid uuid)
+    {
+        // Version is stored in bits 48-51 (4 bits after the timestamp)
+        Span<byte> bytes = stackalloc byte[16];
+        uuid.TryWriteBytes(bytes);
+        return (bytes[6] >> 4) == 7;
+    }
+}
+```
+
+**Entity Base Class:**
+
+```csharp
+public abstract class BaseEntity
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+
+    // CreatedAt can be derived from Id, but we keep it explicit for queries
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ModifiedAt { get; set; }
+
+    /// <summary>
+    /// Gets the creation timestamp from the UUID v7 identifier.
+    /// Useful for verification or when CreatedAt wasn't set.
+    /// </summary>
+    [NotMapped]
+    public DateTimeOffset IdTimestamp => Id.GetTimestamp();
+}
+```
+
+**EF Core Configuration:**
+
+```csharp
+public class BaseEntityConfiguration<T> : IEntityTypeConfiguration<T>
+    where T : BaseEntity
+{
+    public virtual void Configure(EntityTypeBuilder<T> builder)
+    {
+        builder.HasKey(e => e.Id);
+
+        // UUID v7 generated on application side
+        builder.Property(e => e.Id)
+            .ValueGeneratedNever(); // We generate it, not the DB
+
+        builder.Property(e => e.CreatedAt)
+            .HasColumnType("datetimeoffset")
+            .IsRequired();
+
+        builder.Property(e => e.ModifiedAt)
+            .HasColumnType("datetimeoffset");
+    }
+}
+```
+
+**Usage Guidelines:**
+
+1. Always generate IDs on the application side using `Guid.CreateVersion7()`
+2. Never use `Guid.NewGuid()` for entity IDs
+3. Use `Id.GetTimestamp()` when you need to know when an entity was created
+4. Keep explicit `CreatedAt` for indexed queries (extracting from UUID is slower)
+5. For high-throughput scenarios, consider Medo.Uuid7 for monotonic guarantees
 
 ### Null Handling
 
@@ -1994,6 +2112,7 @@ Closes #123
 | Projections | Select only needed columns |
 | Async | All I/O operations async |
 | DateTimeOffset | Always use instead of DateTime for timestamps |
+| UUID v7 | All entity IDs use `Guid.CreateVersion7()` |
 | Validation | FluentValidation on all inputs |
 | Error handling | Global handler, typed exceptions |
 | Logging | Structured, correlated, appropriate level |

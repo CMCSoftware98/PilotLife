@@ -4871,7 +4871,1184 @@ PilotLife.Application/Services/Marketplace/
 
 ---
 
-## Phase 6: Player Auctions
+## Phase 6: Free Trade & Commodity Market System
+
+### Overview
+
+Beyond structured jobs, players have complete freedom to fly anywhere and engage in commodity trading. This system creates a dynamic player-driven economy where supply and demand fluctuate based on regional characteristics, random market events, and most importantly - player activity.
+
+**Core Principles:**
+- Buy low in production regions, sell high in consumption regions
+- Player deliveries affect local supply, influencing prices
+- Market events create opportunities and risks
+- Information asymmetry rewards market research
+- Perishables add time pressure and risk
+
+---
+
+### Commodity Categories
+
+```csharp
+public enum CommodityCategory
+{
+    RawMaterials,      // Steel, Aluminum, Copper, Lumber, Concrete
+    ManufacturedGoods, // Electronics, Machinery, Auto Parts, Textiles
+    Agricultural,      // Grain, Livestock Feed, Seeds, Fertilizer
+    Perishables,       // Fresh Produce, Seafood, Flowers, Medical Samples
+    Luxury,            // Fine Wine, Art, Jewelry, Designer Goods
+    Energy,            // Aviation Fuel, Industrial Oil, Propane
+    Medical,           // Pharmaceuticals, Equipment, Vaccines
+    HazardousMaterials // Chemicals, Explosives, Radioactive (requires endorsement)
+}
+
+public class Commodity
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public CommodityCategory Category { get; set; }
+
+    // Pricing
+    public decimal BasePricePerLb { get; set; }    // Global baseline
+    public decimal PriceVolatility { get; set; }   // How much prices can swing (0.1-0.5)
+
+    // Physical properties
+    public double WeightPerUnit { get; set; }      // Lbs per unit
+    public double VolumePerUnit { get; set; }      // Cubic feet per unit
+    public double DensityRatio { get; set; }       // Weight vs volume constraint
+
+    // Perishability (null = non-perishable)
+    public TimeSpan? ShelfLife { get; set; }
+    public double? DecayRate { get; set; }         // Value loss per hour after 50% shelf life
+
+    // Requirements
+    public bool IsHazardous { get; set; }
+    public string[]? RequiredEndorsements { get; set; }
+    public string[]? RequiredAircraftFeatures { get; set; } // "Refrigerated", "HazmatCertified"
+
+    // Trading
+    public double MinTradeQuantity { get; set; }   // Minimum purchase (lbs)
+    public double MarketSpread { get; set; }       // Buy/sell price difference (0.05-0.15)
+}
+```
+
+### Commodity Examples
+
+| Commodity | Category | Base $/lb | Shelf Life | Notes |
+|-----------|----------|-----------|------------|-------|
+| Steel Ingots | RawMaterials | $0.80 | - | Heavy, low margin, high volume |
+| Aluminum Sheets | RawMaterials | $2.50 | - | Lighter, better margins |
+| Copper Wire | RawMaterials | $4.00 | - | High value raw material |
+| Lumber | RawMaterials | $0.40 | - | Very heavy, low value |
+| Auto Parts | ManufacturedGoods | $15.00 | - | Good margin, moderate weight |
+| Electronics | ManufacturedGoods | $45.00 | - | High value, light weight |
+| Industrial Machinery | ManufacturedGoods | $8.00 | - | Heavy, specialized |
+| Grain | Agricultural | $0.25 | 30 days | Bulk commodity |
+| Livestock Feed | Agricultural | $0.35 | 14 days | Regional demand |
+| Fresh Produce | Perishables | $3.00 | 18 hours | Fast decay, high margin potential |
+| Seafood | Perishables | $12.00 | 12 hours | Very time-sensitive |
+| Flowers | Perishables | $8.00 | 24 hours | Luxury perishable |
+| Medical Samples | Perishables | $150.00 | 4 hours | Critical, highest margins |
+| Fine Wine | Luxury | $35.00 | - | Premium routes only |
+| Designer Goods | Luxury | $80.00 | - | Urban destinations |
+| Aviation Fuel | Energy | $3.50 | - | Universal demand |
+| Pharmaceuticals | Medical | $65.00 | 60 days | Regulated, good margins |
+| Industrial Chemicals | HazardousMaterials | $18.00 | - | Requires HazMat endorsement |
+
+---
+
+### Regional Market System
+
+Every airport/region has a unique economic profile that determines what commodities it produces, consumes, and at what rates.
+
+```csharp
+public class RegionalMarket
+{
+    public Guid Id { get; set; }
+    public Guid WorldId { get; set; }
+    public string AirportIcao { get; set; }
+    public string RegionCode { get; set; }         // "US-MIDWEST", "EU-CENTRAL", etc.
+    public RegionEconomicType EconomicType { get; set; }
+
+    // Production profile (what this region makes)
+    public List<ProductionProfile> Productions { get; set; }
+
+    // Consumption profile (what this region needs)
+    public List<ConsumptionProfile> Consumptions { get; set; }
+
+    // Storage
+    public double TotalStorageCapacity { get; set; }
+    public double CurrentStorageUsed { get; set; }
+
+    // Market state per commodity
+    public List<CommodityMarketState> MarketStates { get; set; }
+
+    // Modifiers
+    public double ImportTariff { get; set; }       // Additional cost for imports (0-0.2)
+    public double ExportTax { get; set; }          // Tax on exports (0-0.1)
+    public bool IsTradeHub { get; set; }           // Higher volume, tighter spreads
+
+    public DateTimeOffset LastMarketUpdate { get; set; }
+}
+
+public enum RegionEconomicType
+{
+    IndustrialHub,      // Detroit, Sheffield - manufactures goods, consumes materials
+    AgriculturalCenter, // Kansas, Norfolk - produces food, needs equipment
+    TechHub,            // Silicon Valley, Cambridge - produces electronics
+    PortCity,           // Rotterdam, Singapore - import/export, everything flows
+    MiningRegion,       // Alaska, Australia - raw materials production
+    TouristDestination, // Hawaii, Caribbean - consumes everything, produces nothing
+    FinancialCenter,    // NYC, London - high luxury demand
+    DevelopingRegion,   // Growing areas - high demand for everything
+    RemoteOutpost       // Alaska bush, Pacific islands - desperate for supplies
+}
+
+public class ProductionProfile
+{
+    public Guid CommodityId { get; set; }
+    public double DailyProductionRate { get; set; }    // Units per game day
+    public double ProductionCostModifier { get; set; } // 0.7-1.3, affects base price
+    public bool IsPrimaryProduct { get; set; }         // Main export
+}
+
+public class ConsumptionProfile
+{
+    public Guid CommodityId { get; set; }
+    public double DailyConsumptionRate { get; set; }   // Units per game day
+    public double DemandElasticity { get; set; }       // How much demand changes with price
+    public bool IsEssential { get; set; }              // Demand stays high even at high prices
+}
+```
+
+### Regional Economic Profiles
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     REGIONAL ECONOMIC PROFILES                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  INDUSTRIAL HUB (Detroit, Sheffield, Stuttgart)                              │
+│  ├── Produces: Auto Parts, Machinery, Manufactured Goods                     │
+│  ├── Consumes: Steel, Aluminum, Electronics, Energy                          │
+│  ├── Price Modifier: -20% on manufactured goods (production surplus)         │
+│  └── Trade Volume: Very High                                                 │
+│                                                                              │
+│  AGRICULTURAL CENTER (Kansas, Iowa, East Anglia)                             │
+│  ├── Produces: Grain, Livestock Feed, Fresh Produce                          │
+│  ├── Consumes: Machinery, Fuel, Fertilizer, Seeds                            │
+│  ├── Price Modifier: -30% on agricultural goods                              │
+│  └── Seasonal Variation: High (harvest seasons)                              │
+│                                                                              │
+│  TECH HUB (San Jose, Cambridge, Shenzhen)                                    │
+│  ├── Produces: Electronics, Software Equipment, Medical Devices              │
+│  ├── Consumes: Rare Materials, Luxury Goods, Everything else                 │
+│  ├── Price Modifier: -25% on electronics, +15% on labor-intensive goods      │
+│  └── Trade Volume: High value, lower weight                                  │
+│                                                                              │
+│  PORT CITY (Rotterdam, Singapore, Los Angeles)                               │
+│  ├── Produces: Nothing specific (transshipment hub)                          │
+│  ├── Consumes: Moderate everything                                           │
+│  ├── Price Modifier: Baseline (±5%), tightest spreads                        │
+│  └── Trade Volume: Extremely High, best for arbitrage                        │
+│                                                                              │
+│  MINING/EXTRACTION (Anchorage, Perth, Stavanger)                             │
+│  ├── Produces: Raw Materials, Metals, Energy                                 │
+│  ├── Consumes: Machinery, Food, Luxury (premium for remote)                  │
+│  ├── Price Modifier: -40% on raw materials, +25% on imports                  │
+│  └── Trade Volume: High outbound, low inbound                                │
+│                                                                              │
+│  TOURIST DESTINATION (Honolulu, Cancun, Maldives)                            │
+│  ├── Produces: Nothing                                                       │
+│  ├── Consumes: Everything (especially luxury, perishables)                   │
+│  ├── Price Modifier: +30-50% on everything (import dependent)                │
+│  └── Seasonal Variation: High (tourist seasons)                              │
+│                                                                              │
+│  FINANCIAL CENTER (New York, London, Tokyo)                                  │
+│  ├── Produces: Nothing physical                                              │
+│  ├── Consumes: Luxury Goods, Electronics, Fresh Perishables                  │
+│  ├── Price Modifier: +20% on luxury, +10% on everything                      │
+│  └── Trade Volume: High value goods                                          │
+│                                                                              │
+│  REMOTE OUTPOST (Bush Alaska, Pacific Islands, Research Stations)            │
+│  ├── Produces: Minimal (maybe fish, raw materials)                           │
+│  ├── Consumes: Everything desperately                                        │
+│  ├── Price Modifier: +50-100% on everything (supply lifeline)                │
+│  └── Trade Volume: Low but critical, highest margins                         │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Supply & Demand Mechanics
+
+The heart of the trading system - prices dynamically adjust based on supply levels and demand pressure.
+
+```csharp
+public class CommodityMarketState
+{
+    public Guid CommodityId { get; set; }
+    public Commodity Commodity { get; set; }
+
+    // Supply (0-200%, 100% = normal inventory level)
+    public double CurrentSupply { get; set; }      // Actual units in stock
+    public double NormalSupplyLevel { get; set; } // Baseline inventory
+    public double SupplyPercentage => (CurrentSupply / NormalSupplyLevel) * 100;
+
+    // Demand (0-200%, 100% = normal consumption rate)
+    public double CurrentDemand { get; set; }      // Current consumption rate
+    public double NormalDemandLevel { get; set; } // Baseline consumption
+    public double DemandPercentage => (CurrentDemand / NormalDemandLevel) * 100;
+
+    // Calculated prices
+    public decimal CurrentBuyPrice { get; set; }   // Price to buy FROM market
+    public decimal CurrentSellPrice { get; set; }  // Price market pays for YOUR goods
+    public decimal Spread { get; set; }            // Difference (market's cut)
+
+    // Trends
+    public PriceTrend Trend { get; set; }          // Rising, Falling, Stable
+    public double TrendStrength { get; set; }      // How fast it's moving
+    public decimal PriceChange24h { get; set; }    // % change in last game day
+
+    // Last player impact
+    public DateTimeOffset LastPlayerDelivery { get; set; }
+    public double LastDeliveryQuantity { get; set; }
+    public double PlayerImpactRemaining { get; set; } // Decays over time
+}
+
+public enum PriceTrend { Rising, Stable, Falling }
+```
+
+### Price Calculation Formula
+
+```csharp
+public class MarketPriceCalculator
+{
+    /// <summary>
+    /// Calculates current market prices based on supply, demand, and modifiers.
+    /// </summary>
+    public MarketPrices CalculatePrices(
+        Commodity commodity,
+        CommodityMarketState state,
+        RegionalMarket market,
+        List<MarketEvent> activeEvents)
+    {
+        // 1. Start with base price
+        decimal basePrice = commodity.BasePricePerLb;
+
+        // 2. Apply supply modifier (lower supply = higher price)
+        decimal supplyMod = GetSupplyModifier(state.SupplyPercentage);
+
+        // 3. Apply demand modifier (higher demand = higher price)
+        decimal demandMod = GetDemandModifier(state.DemandPercentage);
+
+        // 4. Apply regional production/consumption modifier
+        decimal regionalMod = GetRegionalModifier(commodity.Id, market);
+
+        // 5. Apply active market events
+        decimal eventMod = GetEventModifier(commodity.Id, market.RegionCode, activeEvents);
+
+        // 6. Apply daily random noise (±5%)
+        decimal noiseMod = 0.95m + (decimal)(_random.NextDouble() * 0.10);
+
+        // 7. Calculate final market price
+        decimal marketPrice = basePrice
+            * supplyMod
+            * demandMod
+            * regionalMod
+            * eventMod
+            * noiseMod;
+
+        // 8. Calculate buy and sell prices with spread
+        decimal spread = commodity.MarketSpread;
+        if (market.IsTradeHub) spread *= 0.5m; // Tighter spreads at hubs
+
+        return new MarketPrices
+        {
+            BuyPrice = Math.Round(marketPrice * (1 + spread / 2), 2),
+            SellPrice = Math.Round(marketPrice * (1 - spread / 2), 2),
+            Spread = spread,
+            BasePrice = basePrice,
+            EffectiveMultiplier = supplyMod * demandMod * regionalMod * eventMod
+        };
+    }
+
+    private decimal GetSupplyModifier(double supplyPercentage)
+    {
+        // Non-linear curve: shortages spike prices, gluts crash them
+        return supplyPercentage switch
+        {
+            <= 10 => 3.50m,   // Critical shortage - extreme prices
+            <= 20 => 2.80m,
+            <= 30 => 2.30m,
+            <= 40 => 1.90m,
+            <= 50 => 1.60m,
+            <= 60 => 1.35m,
+            <= 70 => 1.18m,
+            <= 80 => 1.08m,
+            <= 90 => 1.02m,
+            <= 110 => 1.00m,  // Normal range
+            <= 120 => 0.95m,
+            <= 130 => 0.88m,
+            <= 140 => 0.78m,
+            <= 150 => 0.68m,
+            <= 160 => 0.58m,
+            <= 170 => 0.48m,
+            <= 180 => 0.40m,
+            <= 190 => 0.35m,
+            _ => 0.30m        // Massive glut - fire sale
+        };
+    }
+
+    private decimal GetDemandModifier(double demandPercentage)
+    {
+        return demandPercentage switch
+        {
+            <= 20 => 0.40m,   // No one wants it
+            <= 40 => 0.60m,
+            <= 60 => 0.80m,
+            <= 80 => 0.92m,
+            <= 100 => 1.00m,  // Normal demand
+            <= 120 => 1.12m,
+            <= 140 => 1.30m,
+            <= 160 => 1.55m,
+            <= 180 => 1.90m,
+            _ => 2.50m        // Desperate need
+        };
+    }
+
+    private decimal GetRegionalModifier(Guid commodityId, RegionalMarket market)
+    {
+        // Check if this region produces this commodity
+        var production = market.Productions
+            .FirstOrDefault(p => p.CommodityId == commodityId);
+
+        if (production != null)
+        {
+            // Production area = cheaper prices
+            return production.ProductionCostModifier; // 0.6-0.9 typically
+        }
+
+        // Check consumption profile
+        var consumption = market.Consumptions
+            .FirstOrDefault(c => c.CommodityId == commodityId);
+
+        if (consumption?.IsEssential == true)
+        {
+            // Essential goods in consumption areas = premium
+            return 1.15m;
+        }
+
+        return 1.0m; // Baseline
+    }
+}
+```
+
+### Supply/Demand Level Guide
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SUPPLY LEVEL INDICATORS                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  CRITICAL SHORTAGE (0-30%)         🔴🔴🔴                                   │
+│  ├── Price Modifier: ×2.3 - ×3.5                                            │
+│  ├── Visual: "CRITICAL - Severe Shortage"                                   │
+│  ├── Opportunity: Massive profit potential                                  │
+│  └── Risk: Prices may crash after delivery                                  │
+│                                                                              │
+│  LOW SUPPLY (30-70%)               🟠🟠                                     │
+│  ├── Price Modifier: ×1.2 - ×1.9                                            │
+│  ├── Visual: "LOW - High Demand"                                            │
+│  ├── Opportunity: Good margins available                                    │
+│  └── Risk: Competition from other traders                                   │
+│                                                                              │
+│  NORMAL (70-130%)                  🟢                                       │
+│  ├── Price Modifier: ×0.9 - ×1.1                                            │
+│  ├── Visual: "NORMAL - Stable Market"                                       │
+│  ├── Opportunity: Baseline trading                                          │
+│  └── Risk: Low margins                                                      │
+│                                                                              │
+│  OVERSUPPLY (130-170%)             🔵🔵                                     │
+│  ├── Price Modifier: ×0.5 - ×0.8                                            │
+│  ├── Visual: "HIGH - Oversupplied"                                          │
+│  ├── Opportunity: Cheap buying for later                                    │
+│  └── Risk: May drop further                                                 │
+│                                                                              │
+│  GLUT (170-200%+)                  ⚪⚪⚪                                    │
+│  ├── Price Modifier: ×0.3 - ×0.4                                            │
+│  ├── Visual: "GLUT - No Buyers"                                             │
+│  ├── Opportunity: Extreme speculation                                       │
+│  └── Risk: Storage costs, no immediate market                               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Player Impact on Markets
+
+**The most important feature: Players affect the economy.**
+
+```csharp
+public class MarketImpactService
+{
+    /// <summary>
+    /// Processes the market impact when a player sells commodities.
+    /// </summary>
+    public async Task ProcessPlayerSaleAsync(
+        TradeTransaction sale,
+        RegionalMarket market,
+        CancellationToken ct)
+    {
+        var state = market.MarketStates
+            .First(s => s.CommodityId == sale.CommodityId);
+
+        // 1. Calculate impact based on delivery size vs daily consumption
+        double dailyConsumption = market.Consumptions
+            .FirstOrDefault(c => c.CommodityId == sale.CommodityId)
+            ?.DailyConsumptionRate ?? state.NormalDemandLevel;
+
+        double impactRatio = sale.Quantity / dailyConsumption;
+
+        // 2. Apply supply increase
+        state.CurrentSupply += sale.Quantity;
+
+        // 3. Calculate price impact
+        //    Small deliveries (< 5% daily): Minimal impact
+        //    Medium deliveries (5-20%): Noticeable drop
+        //    Large deliveries (20-50%): Significant market move
+        //    Massive deliveries (> 50%): Market crash for that commodity
+
+        double priceImpact = CalculatePriceImpact(impactRatio);
+
+        // 4. Store impact for decay over time
+        state.PlayerImpactRemaining += priceImpact;
+        state.LastPlayerDelivery = DateTimeOffset.UtcNow;
+        state.LastDeliveryQuantity = sale.Quantity;
+
+        // 5. Immediately recalculate prices
+        await RecalculateMarketPricesAsync(market, ct);
+
+        // 6. Log for audit and analytics
+        await _auditService.LogPlayerActionAsync(
+            sale.PlayerWorldId,
+            "MARKET_SALE",
+            new { CommodityId = sale.CommodityId, Quantity = sale.Quantity },
+            new { PriceImpact = priceImpact, NewSupply = state.SupplyPercentage },
+            sale.TotalAmount);
+
+        // 7. Notify other players in region (optional - market alerts)
+        if (impactRatio > 0.1) // > 10% of daily consumption
+        {
+            await _notificationService.BroadcastMarketAlertAsync(
+                market.AirportIcao,
+                $"Large {sale.Commodity.Name} delivery received. Prices adjusting.",
+                ct);
+        }
+    }
+
+    private double CalculatePriceImpact(double impactRatio)
+    {
+        // Returns expected price drop percentage
+        return impactRatio switch
+        {
+            < 0.01 => 0.00,     // < 1% daily consumption: No impact
+            < 0.05 => 0.02,     // 1-5%: 2% price drop
+            < 0.10 => 0.05,     // 5-10%: 5% drop
+            < 0.20 => 0.10,     // 10-20%: 10% drop
+            < 0.35 => 0.18,     // 20-35%: 18% drop
+            < 0.50 => 0.28,     // 35-50%: 28% drop
+            < 0.75 => 0.40,     // 50-75%: 40% drop
+            < 1.00 => 0.55,     // 75-100%: 55% drop
+            _ => 0.70           // > 100%: 70% drop (market flooded)
+        };
+    }
+}
+```
+
+### Market Recovery & Natural Flow
+
+```csharp
+public class MarketSimulationService
+{
+    /// <summary>
+    /// Background service runs every 15 minutes to simulate market dynamics.
+    /// </summary>
+    public async Task SimulateMarketCycleAsync(Guid worldId, CancellationToken ct)
+    {
+        var markets = await _marketRepository.GetAllAsync(worldId, ct);
+
+        foreach (var market in markets)
+        {
+            foreach (var state in market.MarketStates)
+            {
+                // 1. Apply production (adds to supply)
+                var production = market.Productions
+                    .FirstOrDefault(p => p.CommodityId == state.CommodityId);
+                if (production != null)
+                {
+                    double produced = production.DailyProductionRate / 96; // 15-min tick
+                    state.CurrentSupply += produced;
+                }
+
+                // 2. Apply consumption (removes from supply)
+                var consumption = market.Consumptions
+                    .FirstOrDefault(c => c.CommodityId == state.CommodityId);
+                if (consumption != null)
+                {
+                    double consumed = consumption.DailyConsumptionRate / 96;
+                    state.CurrentSupply = Math.Max(0, state.CurrentSupply - consumed);
+                }
+
+                // 3. Natural price equilibrium (reduces extreme prices over time)
+                DecayPlayerImpact(state);
+
+                // 4. NPC trading (prevents extreme shortages/gluts)
+                await SimulateNpcTradingAsync(state, market, ct);
+
+                // 5. Adjust demand based on price (price elasticity)
+                AdjustDemandForPrice(state, consumption);
+            }
+
+            // 6. Recalculate all prices
+            await RecalculateMarketPricesAsync(market, ct);
+
+            market.LastMarketUpdate = DateTimeOffset.UtcNow;
+        }
+
+        await _marketRepository.UpdateRangeAsync(markets, ct);
+    }
+
+    private void DecayPlayerImpact(CommodityMarketState state)
+    {
+        // Player impact decays by 10% per game hour (about 4% per real hour)
+        // This prevents permanent market manipulation
+        if (state.PlayerImpactRemaining > 0)
+        {
+            double decayRate = 0.10 / 4; // Per 15-min tick
+            state.PlayerImpactRemaining *= (1 - decayRate);
+
+            if (state.PlayerImpactRemaining < 0.01)
+                state.PlayerImpactRemaining = 0;
+        }
+    }
+
+    private async Task SimulateNpcTradingAsync(
+        CommodityMarketState state,
+        RegionalMarket market,
+        CancellationToken ct)
+    {
+        // NPC traders step in at extreme conditions to stabilize
+        // This prevents markets from becoming completely broken
+
+        if (state.SupplyPercentage < 20) // Critical shortage
+        {
+            // NPCs import emergency supplies
+            double emergencyImport = state.NormalSupplyLevel * 0.05;
+            state.CurrentSupply += emergencyImport;
+        }
+        else if (state.SupplyPercentage > 180) // Massive glut
+        {
+            // NPCs export excess (or it "spoils"/disappears)
+            double excessRemoval = (state.CurrentSupply - state.NormalSupplyLevel * 1.5) * 0.1;
+            state.CurrentSupply -= excessRemoval;
+        }
+    }
+}
+```
+
+---
+
+### Market Events System
+
+Random and scheduled events that affect supply, demand, and prices across regions.
+
+```csharp
+public class MarketEvent
+{
+    public Guid Id { get; set; }
+    public Guid WorldId { get; set; }
+
+    public MarketEventType Type { get; set; }
+    public MarketEventSeverity Severity { get; set; }
+
+    public string Title { get; set; }
+    public string Description { get; set; }
+    public string? NewsHeadline { get; set; }       // What players see
+
+    // Scope
+    public string[]? AffectedRegions { get; set; }  // null = global
+    public Guid[]? AffectedCommodities { get; set; }// null = category-wide
+    public CommodityCategory? AffectedCategory { get; set; }
+
+    // Effects
+    public double SupplyModifier { get; set; }      // 0.5 = -50% supply, 1.5 = +50%
+    public double DemandModifier { get; set; }      // Same as above
+    public double PriceFloor { get; set; }          // Minimum price multiplier
+    public double PriceCeiling { get; set; }        // Maximum price multiplier
+
+    // Timing
+    public DateTimeOffset StartsAt { get; set; }
+    public DateTimeOffset EndsAt { get; set; }
+    public DateTimeOffset? AnnouncedAt { get; set; } // Advance warning
+    public bool IsActive { get; set; }
+
+    // Recurrence
+    public bool IsRecurring { get; set; }
+    public string? RecurrencePattern { get; set; }  // "YEARLY:HARVEST", "MONTHLY:1"
+}
+
+public enum MarketEventType
+{
+    // Supply Events
+    FactoryShutdown,        // -30 to -50% production
+    MiningAccident,         // -20 to -40% raw materials
+    BumperHarvest,          // +40 to +60% agricultural
+    NewFactoryOpening,      // +20 to +30% production
+    SupplyChainDisruption,  // -25% across categories
+    WorkersStrike,          // -40% in specific region
+
+    // Demand Events
+    ConstructionBoom,       // +40% material demand
+    HolidaySeason,          // +30% luxury, +20% perishables
+    TechProductLaunch,      // +50% electronics demand
+    NaturalDisaster,        // +100% medical/supplies, -50% luxury
+    EconomicRecession,      // -25% all demand
+    MajorSportingEvent,     // +40% food, +30% luxury in region
+
+    // Price Events
+    TariffIncrease,         // +15% import prices
+    SubsidyProgram,         // -20% specific commodity
+    FuelCrisis,             // +50% energy prices globally
+    CurrencyFluctuation,    // ±20% regional prices
+
+    // Special Events
+    TradeEmbargo,           // Region cut off from specific goods
+    PortCongestion,         // Trade hub disruption
+    WeatherEmergency,       // Regional transport affected
+    PandemicOutbreak        // Medical +200%, everything else affected
+}
+
+public enum MarketEventSeverity
+{
+    Minor,      // ±10-20% impact
+    Moderate,   // ±20-40% impact
+    Major,      // ±40-60% impact
+    Severe,     // ±60-100% impact
+    Catastrophic // +100% or more impact
+}
+```
+
+### Example Market Events
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        SAMPLE MARKET EVENTS                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  📰 "Steel Mill Fire in Sheffield Region"                                    │
+│  ├── Type: FactoryShutdown                                                  │
+│  ├── Severity: Major                                                        │
+│  ├── Affected: Steel, Auto Parts in EU-CENTRAL                              │
+│  ├── Effect: Supply -45% for 2 game weeks                                   │
+│  └── Opportunity: Import steel from US-MIDWEST, sell at premium             │
+│                                                                              │
+│  📰 "Record Harvest Expected in US Midwest"                                  │
+│  ├── Type: BumperHarvest                                                    │
+│  ├── Severity: Moderate                                                     │
+│  ├── Affected: Grain, Agricultural in US-MIDWEST                            │
+│  ├── Effect: Supply +50% for 1 game month                                   │
+│  └── Opportunity: Buy cheap, export to consumption regions                  │
+│                                                                              │
+│  📰 "Major Hurricane Approaching Caribbean"                                  │
+│  ├── Type: NaturalDisaster                                                  │
+│  ├── Severity: Severe                                                       │
+│  ├── Affected: All commodities in CARIBBEAN region                          │
+│  ├── Effect: Medical/Supplies demand +150%, Luxury demand -60%              │
+│  └── Opportunity: Emergency supply runs, ignore luxury routes               │
+│                                                                              │
+│  📰 "Holiday Shopping Season Begins"                                         │
+│  ├── Type: HolidaySeason                                                    │
+│  ├── Severity: Moderate                                                     │
+│  ├── Affected: Luxury, Electronics globally                                 │
+│  ├── Effect: Demand +35% for 3 game weeks                                   │
+│  └── Opportunity: Stock up before, sell during peak                         │
+│                                                                              │
+│  📰 "OPEC Announces Production Cuts"                                         │
+│  ├── Type: FuelCrisis                                                       │
+│  ├── Severity: Major                                                        │
+│  ├── Affected: Energy category globally                                     │
+│  ├── Effect: Fuel prices +40% for 1 game month                              │
+│  └── Impact: Higher operating costs, affects all trade routes               │
+│                                                                              │
+│  📰 "Tech Giant Announces New Product Line"                                  │
+│  ├── Type: TechProductLaunch                                                │
+│  ├── Severity: Moderate                                                     │
+│  ├── Affected: Electronics in TECH-HUB regions                              │
+│  ├── Effect: Electronics demand +45% for 2 game weeks                       │
+│  └── Opportunity: Rush electronics to retail centers                        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Event Generation
+
+```csharp
+public class MarketEventService
+{
+    /// <summary>
+    /// Generates random market events based on world settings.
+    /// Called daily by background service.
+    /// </summary>
+    public async Task GenerateRandomEventsAsync(Guid worldId, CancellationToken ct)
+    {
+        var worldSettings = await _worldService.GetSettingsAsync(worldId, ct);
+        var eventFrequency = worldSettings.MarketEventFrequency; // 0.5-2.0
+
+        // Base: 1-2 events per game week
+        double eventsPerDay = (1.5 / 7) * eventFrequency;
+
+        if (_random.NextDouble() > eventsPerDay)
+            return; // No event today
+
+        // Select event type (weighted)
+        var eventType = SelectRandomEventType();
+
+        // Select affected region(s)
+        var regions = await SelectAffectedRegionsAsync(eventType, worldId, ct);
+
+        // Select affected commodities
+        var commodities = SelectAffectedCommodities(eventType);
+
+        // Determine severity (mostly minor/moderate)
+        var severity = SelectSeverity();
+
+        // Calculate duration
+        var duration = CalculateDuration(eventType, severity);
+
+        // Create event
+        var marketEvent = new MarketEvent
+        {
+            Id = Guid.NewGuid(),
+            WorldId = worldId,
+            Type = eventType,
+            Severity = severity,
+            Title = GenerateTitle(eventType, regions, commodities),
+            Description = GenerateDescription(eventType, severity),
+            NewsHeadline = GenerateHeadline(eventType, regions),
+            AffectedRegions = regions,
+            AffectedCommodities = commodities?.Select(c => c.Id).ToArray(),
+            SupplyModifier = CalculateSupplyModifier(eventType, severity),
+            DemandModifier = CalculateDemandModifier(eventType, severity),
+            StartsAt = DateTimeOffset.UtcNow.AddHours(_random.Next(1, 12)),
+            EndsAt = DateTimeOffset.UtcNow.AddHours(duration),
+            AnnouncedAt = DateTimeOffset.UtcNow, // Immediate announcement
+            IsActive = false // Will activate at StartsAt
+        };
+
+        await _eventRepository.AddAsync(marketEvent, ct);
+
+        // Broadcast news alert
+        await _notificationService.BroadcastNewsAsync(
+            worldId,
+            marketEvent.NewsHeadline,
+            marketEvent.Description,
+            ct);
+    }
+}
+```
+
+---
+
+### Perishables & Time Pressure
+
+Perishable commodities add urgency and risk to trading.
+
+```csharp
+public class PerishableService
+{
+    /// <summary>
+    /// Calculates current value of perishable inventory.
+    /// </summary>
+    public decimal CalculateCurrentValue(
+        PlayerInventory inventory,
+        Commodity commodity)
+    {
+        if (commodity.ShelfLife == null)
+            return inventory.Quantity * inventory.PurchasePrice; // Non-perishable
+
+        // Calculate freshness (1.0 = fresh, 0.0 = spoiled)
+        var age = DateTimeOffset.UtcNow - inventory.PurchasedAt;
+        var shelfLife = commodity.ShelfLife.Value;
+
+        if (age >= shelfLife)
+            return 0; // Completely spoiled
+
+        double freshnessRatio = 1.0 - (age.TotalHours / shelfLife.TotalHours);
+
+        // Value curve: stays high until 50%, then drops rapidly
+        double valueMultiplier;
+        if (freshnessRatio > 0.5)
+        {
+            // 100% to 50% freshness: Value is 100% to 90%
+            valueMultiplier = 0.9 + (freshnessRatio - 0.5) * 0.2;
+        }
+        else
+        {
+            // 50% to 0% freshness: Value drops from 90% to 0%
+            valueMultiplier = freshnessRatio * 1.8;
+        }
+
+        return (decimal)(inventory.Quantity * (double)inventory.PurchasePrice * valueMultiplier);
+    }
+
+    /// <summary>
+    /// Gets freshness display for UI.
+    /// </summary>
+    public FreshnessInfo GetFreshnessInfo(PlayerInventory inventory, Commodity commodity)
+    {
+        if (commodity.ShelfLife == null)
+            return new FreshnessInfo { Display = "Non-perishable", Color = "gray" };
+
+        var age = DateTimeOffset.UtcNow - inventory.PurchasedAt;
+        var remaining = commodity.ShelfLife.Value - age;
+
+        if (remaining <= TimeSpan.Zero)
+            return new FreshnessInfo { Display = "SPOILED", Color = "red", Percentage = 0 };
+
+        double percentage = (remaining.TotalHours / commodity.ShelfLife.Value.TotalHours) * 100;
+
+        return new FreshnessInfo
+        {
+            Display = FormatTimeRemaining(remaining),
+            Percentage = percentage,
+            Color = percentage switch
+            {
+                > 70 => "green",
+                > 40 => "yellow",
+                > 20 => "orange",
+                _ => "red"
+            },
+            RemainingTime = remaining
+        };
+    }
+}
+```
+
+### Perishable Timeline Examples
+
+```
+MEDICAL SAMPLES (4 hour shelf life):
+├── 0-1 hours:  100% value - Perfect condition
+├── 1-2 hours:   95% value - Still excellent
+├── 2-3 hours:   70% value - Degrading, sell soon
+├── 3-3.5 hours: 40% value - Critical
+├── 3.5-4 hours: 10% value - Nearly worthless
+└── 4+ hours:     0% value - Spoiled, unsellable
+
+FRESH SEAFOOD (12 hour shelf life):
+├── 0-3 hours:  100% value - Fresh catch
+├── 3-6 hours:   95% value - Premium quality
+├── 6-9 hours:   75% value - Good quality
+├── 9-11 hours:  40% value - Reduced price
+├── 11-12 hours: 15% value - Clearance
+└── 12+ hours:    0% value - Spoiled
+
+FRESH PRODUCE (18 hour shelf life):
+├── 0-6 hours:  100% value - Farm fresh
+├── 6-9 hours:   90% value - Excellent
+├── 9-12 hours:  70% value - Good
+├── 12-15 hours: 45% value - Fair
+├── 15-18 hours: 20% value - Reduced
+└── 18+ hours:    0% value - Spoiled
+```
+
+---
+
+### Trading Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        FREE TRADE WORKFLOW                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. MARKET RESEARCH                                                          │
+│     ├── View local market prices                                            │
+│     ├── Check supply/demand levels (visible at current location)            │
+│     ├── View regional price trends                                          │
+│     ├── Check active market events                                          │
+│     └── (Premium) Market Intelligence subscription for real-time data       │
+│                                                                              │
+│  2. PURCHASE COMMODITIES                                                     │
+│     ├── Select commodity from local market                                  │
+│     ├── Specify quantity (limited by cash and aircraft capacity)            │
+│     ├── Pay market BUY price                                                │
+│     ├── Commodities added to aircraft cargo hold                            │
+│     └── For perishables: Timer starts immediately                           │
+│                                                                              │
+│  3. TRANSPORT                                                                │
+│     ├── Fly to destination (any airport, no job required)                   │
+│     ├── Aircraft displays current cargo value (updates for perishables)     │
+│     ├── Fuel and operating costs apply as normal                            │
+│     └── Risk: Prices may change during transit                              │
+│                                                                              │
+│  4. SELL AT DESTINATION                                                      │
+│     ├── View local market SELL prices                                       │
+│     ├── Compare to purchase price for profit calculation                    │
+│     ├── Sell all or partial quantity                                        │
+│     ├── Receive payment at market SELL price                                │
+│     ├── YOUR DELIVERY AFFECTS THE MARKET:                                   │
+│     │   └── Supply increases → Prices drop for next traders                 │
+│     └── Transaction logged for reputation and achievements                  │
+│                                                                              │
+│  5. ALTERNATIVE: WAREHOUSE STORAGE                                           │
+│     ├── Instead of selling, store at local warehouse                        │
+│     ├── Rent warehouse space (monthly fee)                                  │
+│     ├── Wait for better prices                                              │
+│     ├── Perishables continue to decay in storage                            │
+│     └── Risk: Prices may move against you                                   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Information & Intelligence
+
+```csharp
+public class MarketIntelligenceService
+{
+    /// <summary>
+    /// Returns market information based on player's location and subscriptions.
+    /// </summary>
+    public async Task<MarketIntelligence> GetMarketIntelligenceAsync(
+        Guid playerWorldId,
+        string currentIcao,
+        CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(playerWorldId, ct);
+        var hasSubscription = player.HasMarketSubscription;
+
+        var intelligence = new MarketIntelligence();
+
+        // LOCAL MARKET - Always full visibility
+        var localMarket = await _marketRepository.GetByIcaoAsync(currentIcao, ct);
+        intelligence.LocalMarket = new LocalMarketData
+        {
+            Prices = localMarket.MarketStates.ToDictionary(
+                s => s.CommodityId,
+                s => new PriceInfo
+                {
+                    BuyPrice = s.CurrentBuyPrice,
+                    SellPrice = s.CurrentSellPrice,
+                    SupplyLevel = GetSupplyLevelDescription(s.SupplyPercentage),
+                    DemandLevel = GetDemandLevelDescription(s.DemandPercentage),
+                    Trend = s.Trend,
+                    Change24h = s.PriceChange24h
+                })
+        };
+
+        // REGIONAL PRICES - Basic view or detailed with subscription
+        var regionalMarkets = await _marketRepository
+            .GetByRegionAsync(localMarket.RegionCode, ct);
+
+        intelligence.RegionalData = regionalMarkets
+            .Where(m => m.AirportIcao != currentIcao)
+            .Select(m => new RegionalMarketSummary
+            {
+                AirportIcao = m.AirportIcao,
+                AirportName = m.Airport.Name,
+                DistanceNm = CalculateDistance(currentIcao, m.AirportIcao),
+                // Without subscription: Only show supply level, not exact prices
+                PriceData = hasSubscription
+                    ? GetDetailedPriceData(m)
+                    : GetBasicPriceData(m) // Just "High/Normal/Low" indicators
+            })
+            .ToList();
+
+        // GLOBAL OPPORTUNITIES - Subscription only
+        if (hasSubscription)
+        {
+            intelligence.GlobalOpportunities = await GetTopOpportunitiesAsync(ct);
+            intelligence.UpcomingEvents = await GetForecastedEventsAsync(ct);
+            intelligence.TradeRoutesSuggestions = await GetSuggestedRoutesAsync(
+                currentIcao, player.OwnedAircraft, ct);
+        }
+
+        // ACTIVE EVENTS - Public knowledge
+        intelligence.ActiveEvents = await _eventRepository
+            .GetActiveEventsAsync(player.WorldId, ct);
+
+        return intelligence;
+    }
+}
+
+public class MarketSubscription
+{
+    public const decimal MonthlyCost = 5000m; // $5,000 per game month (~$1,940/real day)
+
+    // Benefits:
+    // - Real-time prices at ALL airports
+    // - Exact supply/demand percentages
+    // - Price forecasts and trends
+    // - Trade route profit calculators
+    // - Event predictions (24h advance notice)
+    // - Arbitrage opportunity alerts
+}
+```
+
+---
+
+### Trade Route Profitability Calculator
+
+```csharp
+public class TradeRouteCalculator
+{
+    public TradeRouteAnalysis AnalyzeRoute(
+        string originIcao,
+        string destinationIcao,
+        Guid commodityId,
+        double quantity,
+        OwnedAircraft aircraft)
+    {
+        var originMarket = _marketCache.GetMarket(originIcao);
+        var destMarket = _marketCache.GetMarket(destinationIcao);
+        var commodity = _commodityCache.Get(commodityId);
+
+        var originState = originMarket.MarketStates.First(s => s.CommodityId == commodityId);
+        var destState = destMarket.MarketStates.First(s => s.CommodityId == commodityId);
+
+        double distanceNm = CalculateDistance(originIcao, destinationIcao);
+
+        // Cost calculations
+        decimal purchaseCost = (decimal)quantity * originState.CurrentBuyPrice;
+        decimal fuelCost = CalculateFuelCost(aircraft, distanceNm, quantity);
+        decimal totalCost = purchaseCost + fuelCost;
+
+        // Revenue calculations (current prices - may change!)
+        decimal grossRevenue = (decimal)quantity * destState.CurrentSellPrice;
+        decimal netProfit = grossRevenue - totalCost;
+        decimal profitMargin = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
+
+        // Projected price impact from this delivery
+        double dailyConsumption = destMarket.Consumptions
+            .FirstOrDefault(c => c.CommodityId == commodityId)?.DailyConsumptionRate ?? 1000;
+        double impactRatio = quantity / dailyConsumption;
+        decimal projectedPriceDropPercent = (decimal)CalculatePriceImpact(impactRatio) * 100;
+
+        // Time factors
+        TimeSpan flightTime = EstimateFlightTime(aircraft, distanceNm);
+        bool isPerishable = commodity.ShelfLife.HasValue;
+        double freshnessAtArrival = isPerishable
+            ? Math.Max(0, 1 - (flightTime.TotalHours / commodity.ShelfLife.Value.TotalHours))
+            : 1.0;
+
+        // Risk assessment
+        var risks = new List<string>();
+        if (projectedPriceDropPercent > 10)
+            risks.Add($"Your delivery may drop prices by {projectedPriceDropPercent:F0}%");
+        if (destState.SupplyPercentage > 120)
+            risks.Add("Destination already oversupplied");
+        if (originState.SupplyPercentage < 50)
+            risks.Add("Limited supply at origin - prices may rise");
+        if (freshnessAtArrival < 0.5 && isPerishable)
+            risks.Add($"Perishables will be at {freshnessAtArrival:P0} freshness on arrival");
+
+        return new TradeRouteAnalysis
+        {
+            OriginIcao = originIcao,
+            DestinationIcao = destinationIcao,
+            CommodityName = commodity.Name,
+            Quantity = quantity,
+
+            PurchaseCost = purchaseCost,
+            FuelCost = fuelCost,
+            TotalCost = totalCost,
+
+            GrossRevenue = grossRevenue,
+            NetProfit = netProfit,
+            ProfitMargin = profitMargin,
+            ProfitPerNm = distanceNm > 0 ? netProfit / (decimal)distanceNm : 0,
+
+            DistanceNm = distanceNm,
+            EstimatedFlightTime = flightTime,
+            FreshnessAtArrival = freshnessAtArrival,
+
+            ProjectedPriceImpact = projectedPriceDropPercent,
+            Risks = risks,
+
+            Recommendation = GenerateRecommendation(netProfit, profitMargin, risks)
+        };
+    }
+}
+```
+
+---
+
+### Trading vs Jobs Comparison
+
+| Aspect | Structured Jobs | Free Trading |
+|--------|-----------------|--------------|
+| **Risk Level** | Low - guaranteed payout | High - prices fluctuate |
+| **Reward Potential** | Fixed, predictable | Variable, potentially much higher |
+| **Capital Required** | None (rentals available) | Significant upfront investment |
+| **Information** | Complete job details | Partial, requires research |
+| **Skill Required** | Flying proficiency | Market analysis + flying |
+| **Time Pressure** | Deadline-based | Market-based / perishability |
+| **Competition** | Limited (jobs assigned) | Direct (other traders affect prices) |
+| **XP Gain** | Standard XP per job | Trading XP, potential bonuses |
+| **Reputation** | Job completion rep | Trading volume rep |
+| **Best For** | New players, steady income | Experienced players, high risk/reward |
+
+---
+
+### Entities Summary
+
+```
+PilotLife.Database/Entities/Trading/
+├── Commodity.cs
+├── CommodityCategory.cs (enum)
+├── RegionalMarket.cs
+├── RegionEconomicType.cs (enum)
+├── ProductionProfile.cs
+├── ConsumptionProfile.cs
+├── CommodityMarketState.cs
+├── PriceTrend.cs (enum)
+├── MarketEvent.cs
+├── MarketEventType.cs (enum)
+├── MarketEventSeverity.cs (enum)
+├── PlayerInventory.cs
+├── StorageLocation.cs (enum)
+├── Warehouse.cs
+├── WarehouseRental.cs
+├── TradeTransaction.cs
+├── TradeType.cs (enum)
+└── MarketSubscription.cs
+
+PilotLife.Application/Services/Trading/
+├── IMarketPriceCalculator.cs
+├── MarketPriceCalculator.cs
+├── IMarketImpactService.cs
+├── MarketImpactService.cs
+├── IMarketSimulationService.cs
+├── MarketSimulationService.cs
+├── IMarketEventService.cs
+├── MarketEventService.cs
+├── IPerishableService.cs
+├── PerishableService.cs
+├── IMarketIntelligenceService.cs
+├── MarketIntelligenceService.cs
+├── ITradeRouteCalculator.cs
+├── TradeRouteCalculator.cs
+├── ITradingService.cs
+└── TradingService.cs
+```
+
+---
+
+## Phase 7: Player Auctions
 
 ### Auction Types
 - **English**: Ascending bids, most common

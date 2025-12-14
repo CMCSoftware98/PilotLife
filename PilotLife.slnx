@@ -1,4 +1,8 @@
 <Solution>
   <Project Path="PilotLife.API\PilotLife.API.csproj" />
+  <Project Path="PilotLife.Application/PilotLife.Application.csproj" />
   <Project Path="PilotLife.Database\PilotLife.Database.csproj" />
+  <Project Path="PilotLife.Domain/PilotLife.Domain.csproj" />
+  <Project Path="PilotLife.IntegrationTests/PilotLife.IntegrationTests.csproj" />
+  <Project Path="PilotLife.UnitTests/PilotLife.UnitTests.csproj" />
 </Solution>
