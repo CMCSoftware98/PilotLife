@@ -21,6 +21,16 @@ public class PilotLifeDbContext : DbContext
     public DbSet<FlightJob> FlightJobs => Set<FlightJob>();
     public DbSet<FlightFinancials> FlightFinancials => Set<FlightFinancials>();
 
+    // World entities
+    public DbSet<World> Worlds => Set<World>();
+    public DbSet<WorldSettings> WorldSettings => Set<WorldSettings>();
+    public DbSet<PlayerWorld> PlayerWorlds => Set<PlayerWorld>();
+
+    // IAM entities
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         UpdateTimestamps();
@@ -59,6 +69,11 @@ public class PilotLifeDbContext : DbContext
         ConfigureBaseEntity<TrackedFlight>(modelBuilder);
         ConfigureBaseEntity<FlightJob>(modelBuilder);
         ConfigureBaseEntity<FlightFinancials>(modelBuilder);
+        ConfigureBaseEntity<World>(modelBuilder);
+        ConfigureBaseEntity<WorldSettings>(modelBuilder);
+        ConfigureBaseEntity<PlayerWorld>(modelBuilder);
+        ConfigureBaseEntity<Role>(modelBuilder);
+        ConfigureBaseEntity<UserRole>(modelBuilder);
 
         ConfigureUser(modelBuilder);
         ConfigureAirport(modelBuilder);
@@ -69,6 +84,12 @@ public class PilotLifeDbContext : DbContext
         ConfigureTrackedFlight(modelBuilder);
         ConfigureFlightJob(modelBuilder);
         ConfigureFlightFinancials(modelBuilder);
+        ConfigureWorld(modelBuilder);
+        ConfigureWorldSettings(modelBuilder);
+        ConfigurePlayerWorld(modelBuilder);
+        ConfigureRole(modelBuilder);
+        ConfigureRolePermission(modelBuilder);
+        ConfigureUserRole(modelBuilder);
     }
 
     private static void ConfigureBaseEntity<T>(ModelBuilder modelBuilder) where T : BaseEntity
@@ -758,6 +779,410 @@ public class PilotLifeDbContext : DbContext
 
             // Indexes
             entity.HasIndex(e => e.TrackedFlightId).IsUnique();
+        });
+    }
+
+    private static void ConfigureWorld(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<World>(entity =>
+        {
+            entity.ToTable("worlds");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.Slug)
+                .HasColumnName("slug")
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.HasIndex(e => e.Slug).IsUnique();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.Difficulty)
+                .HasColumnName("difficulty")
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.Property(e => e.StartingCapital)
+                .HasColumnName("starting_capital")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.JobPayoutMultiplier)
+                .HasColumnName("job_payout_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.AircraftPriceMultiplier)
+                .HasColumnName("aircraft_price_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.MaintenanceCostMultiplier)
+                .HasColumnName("maintenance_cost_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.LicenseCostMultiplier)
+                .HasColumnName("license_cost_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.LoanInterestMultiplier)
+                .HasColumnName("loan_interest_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.DetectionRiskMultiplier)
+                .HasColumnName("detection_risk_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.FineMultiplier)
+                .HasColumnName("fine_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.JobExpiryMultiplier)
+                .HasColumnName("job_expiry_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.CreditRecoveryMultiplier)
+                .HasColumnName("credit_recovery_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.WorkerSalaryMultiplier)
+                .HasColumnName("worker_salary_multiplier")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.IsActive)
+                .HasColumnName("is_active")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.IsDefault)
+                .HasColumnName("is_default")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.MaxPlayers)
+                .HasColumnName("max_players")
+                .HasDefaultValue(0);
+
+            entity.HasOne(e => e.Settings)
+                .WithOne(s => s.World)
+                .HasForeignKey<WorldSettings>(s => s.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureWorldSettings(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WorldSettings>(entity =>
+        {
+            entity.ToTable("world_settings");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.JobPayoutMultiplierOverride)
+                .HasColumnName("job_payout_multiplier_override")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.AircraftPriceMultiplierOverride)
+                .HasColumnName("aircraft_price_multiplier_override")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.MaintenanceCostMultiplierOverride)
+                .HasColumnName("maintenance_cost_multiplier_override")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.AllowNewPlayers)
+                .HasColumnName("allow_new_players")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.AllowIllegalCargo)
+                .HasColumnName("allow_illegal_cargo")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.EnableAuctions)
+                .HasColumnName("enable_auctions")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.EnableAICrews)
+                .HasColumnName("enable_ai_crews")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.EnableAircraftRental)
+                .HasColumnName("enable_aircraft_rental")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.MaxAircraftPerPlayer)
+                .HasColumnName("max_aircraft_per_player")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.MaxLoansPerPlayer)
+                .HasColumnName("max_loans_per_player")
+                .HasDefaultValue(3);
+
+            entity.Property(e => e.MaxWorkersPerPlayer)
+                .HasColumnName("max_workers_per_player")
+                .HasDefaultValue(10);
+
+            entity.Property(e => e.MaxActiveJobsPerPlayer)
+                .HasColumnName("max_active_jobs_per_player")
+                .HasDefaultValue(5);
+
+            entity.Property(e => e.RequireApprovalToJoin)
+                .HasColumnName("require_approval_to_join")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.EnableChat)
+                .HasColumnName("enable_chat")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.EnableReporting)
+                .HasColumnName("enable_reporting")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.LastModifiedByUserId)
+                .HasColumnName("last_modified_by_user_id");
+
+            entity.HasOne(e => e.LastModifiedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.LastModifiedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => e.WorldId).IsUnique();
+        });
+    }
+
+    private static void ConfigurePlayerWorld(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PlayerWorld>(entity =>
+        {
+            entity.ToTable("player_worlds");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id")
+                .IsRequired();
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.Balance)
+                .HasColumnName("balance")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.CreditScore)
+                .HasColumnName("credit_score")
+                .HasDefaultValue(650);
+
+            entity.Property(e => e.TotalFlightMinutes)
+                .HasColumnName("total_flight_minutes")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.TotalFlights)
+                .HasColumnName("total_flights")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.TotalJobsCompleted)
+                .HasColumnName("total_jobs_completed")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.TotalEarnings)
+                .HasColumnName("total_earnings")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.TotalSpent)
+                .HasColumnName("total_spent")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.ReputationScore)
+                .HasColumnName("reputation_score")
+                .HasPrecision(3, 1)
+                .HasDefaultValue(3.0m);
+
+            entity.Property(e => e.OnTimeDeliveries)
+                .HasColumnName("on_time_deliveries")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.LateDeliveries)
+                .HasColumnName("late_deliveries")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.FailedDeliveries)
+                .HasColumnName("failed_deliveries")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.ViolationPoints)
+                .HasColumnName("violation_points")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.LastViolationAt)
+                .HasColumnName("last_violation_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.IsActive)
+                .HasColumnName("is_active")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.JoinedAt)
+                .HasColumnName("joined_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.LastActiveAt)
+                .HasColumnName("last_active_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.CurrentAirportId)
+                .HasColumnName("current_airport_id");
+
+            entity.Property(e => e.HomeAirportId)
+                .HasColumnName("home_airport_id");
+
+            // Relationships
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.PlayerWorlds)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.World)
+                .WithMany(w => w.Players)
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CurrentAirport)
+                .WithMany()
+                .HasForeignKey(e => e.CurrentAirportId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.HomeAirport)
+                .WithMany()
+                .HasForeignKey(e => e.HomeAirportId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Unique constraint: user can only join a world once
+            entity.HasIndex(e => new { e.UserId, e.WorldId }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.WorldId);
+        });
+    }
+
+    private static void ConfigureRole(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.ToTable("roles");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.HasIndex(e => e.Name).IsUnique();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(255);
+
+            entity.Property(e => e.Priority)
+                .HasColumnName("priority")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.IsSystemRole)
+                .HasColumnName("is_system_role")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IsGlobal)
+                .HasColumnName("is_global")
+                .HasDefaultValue(false);
+        });
+    }
+
+    private static void ConfigureRolePermission(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.ToTable("role_permissions");
+
+            // Composite primary key
+            entity.HasKey(e => new { e.RoleId, e.Permission });
+
+            entity.Property(e => e.RoleId)
+                .HasColumnName("role_id");
+
+            entity.Property(e => e.Permission)
+                .HasColumnName("permission")
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
+            entity.Property(e => e.IsGranted)
+                .HasColumnName("is_granted")
+                .HasDefaultValue(true);
+
+            entity.HasOne(e => e.Role)
+                .WithMany(r => r.Permissions)
+                .HasForeignKey(e => e.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureUserRole(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.ToTable("user_roles");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id")
+                .IsRequired();
+
+            entity.Property(e => e.RoleId)
+                .HasColumnName("role_id")
+                .IsRequired();
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id");
+
+            entity.Property(e => e.GrantedAt)
+                .HasColumnName("granted_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.GrantedByUserId)
+                .HasColumnName("granted_by_user_id")
+                .IsRequired();
+
+            entity.Property(e => e.ExpiresAt)
+                .HasColumnName("expires_at")
+                .HasColumnType("timestamptz");
+
+            // Ignore computed property
+            entity.Ignore(e => e.IsActive);
+
+            // Relationships
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.UserRoles)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Role)
+                .WithMany(r => r.UserRoles)
+                .HasForeignKey(e => e.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.GrantedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.GrantedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Indexes
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.RoleId);
+            entity.HasIndex(e => new { e.UserId, e.RoleId, e.WorldId });
         });
     }
 }

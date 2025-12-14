@@ -468,7 +468,69 @@ export const api = {
         method: 'DELETE',
       }, true),
   },
+
+  worlds: {
+    list: (): Promise<ApiResponse<WorldResponse[]>> =>
+      request<WorldResponse[]>('/api/worlds', {}, true),
+
+    get: (id: string): Promise<ApiResponse<WorldResponse>> =>
+      request<WorldResponse>(`/api/worlds/${id}`, {}, true),
+
+    getBySlug: (slug: string): Promise<ApiResponse<WorldResponse>> =>
+      request<WorldResponse>(`/api/worlds/by-slug/${slug}`, {}, true),
+
+    getMyWorlds: (): Promise<ApiResponse<PlayerWorldResponse[]>> =>
+      request<PlayerWorldResponse[]>('/api/worlds/my-worlds', {}, true),
+
+    join: (worldId: string): Promise<ApiResponse<PlayerWorldResponse>> =>
+      request<PlayerWorldResponse>(`/api/worlds/${worldId}/join`, {
+        method: 'POST',
+      }, true),
+
+    setHomeAirport: (playerWorldId: string, airportId: number): Promise<ApiResponse<PlayerWorldResponse>> =>
+      request<PlayerWorldResponse>(`/api/worlds/my-worlds/${playerWorldId}/set-home-airport`, {
+        method: 'POST',
+        body: JSON.stringify({ airportId }),
+      }, true),
+  },
 };
+
+// World types
+interface WorldResponse {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  difficulty: string;
+  startingCapital: number;
+  jobPayoutMultiplier: number;
+  aircraftPriceMultiplier: number;
+  maintenanceCostMultiplier: number;
+  isDefault: boolean;
+  maxPlayers: number;
+  currentPlayers: number;
+}
+
+interface PlayerWorldResponse {
+  id: string;
+  worldId: string;
+  worldName: string;
+  worldSlug: string;
+  worldDifficulty: string;
+  balance: number;
+  creditScore: number;
+  reputationScore: number;
+  totalFlights: number;
+  totalJobsCompleted: number;
+  totalFlightMinutes: number;
+  totalEarnings: number;
+  currentAirportId?: number;
+  currentAirportIdent?: string;
+  homeAirportId?: number;
+  homeAirportIdent?: string;
+  joinedAt: string;
+  lastActiveAt: string;
+}
 
 export type {
   User,
@@ -484,5 +546,7 @@ export type {
   LoginRequest,
   AircraftRequestResponse,
   AircraftResponse,
-  CreateAircraftRequestData
+  CreateAircraftRequestData,
+  WorldResponse,
+  PlayerWorldResponse
 };

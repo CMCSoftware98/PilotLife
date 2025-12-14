@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import AirportSelectionView from '../views/AirportSelectionView.vue'
+import WorldSelectionView from '../views/WorldSelectionView.vue'
+import WorldAirportSelectionView from '../views/WorldAirportSelectionView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import JobsView from '../views/JobsView.vue'
 import HangarView from '../views/HangarView.vue'
@@ -14,6 +16,7 @@ import AdminView from '../views/AdminView.vue'
 import AppLayout from '../layouts/AppLayout.vue'
 import { useUserStore } from '../stores/user'
 import { useSettingsStore } from '../stores/settings'
+import { useWorldStore } from '../stores/world'
 import { api } from '../services/api'
 
 const routes = [
@@ -34,6 +37,18 @@ const routes = [
     name: 'select-airport',
     component: AirportSelectionView,
     meta: { requiresAuth: true, requiresNoHomeAirport: true },
+  },
+  {
+    path: '/select-world',
+    name: 'select-world',
+    component: WorldSelectionView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/select-world-airport',
+    name: 'select-world-airport',
+    component: WorldAirportSelectionView,
+    meta: { requiresAuth: true, requiresNoWorldHomeAirport: true },
   },
   {
     path: '/',
@@ -96,9 +111,10 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const userStore = useUserStore()
   const settingsStore = useSettingsStore()
+  const worldStore = useWorldStore()
   userStore.loadUser()
 
   const hasValidToken = api.auth.isAuthenticated()
@@ -107,6 +123,7 @@ router.beforeEach((to, _from, next) => {
   // If we have user data but no valid token, clear the session
   if (hasUserData && !hasValidToken) {
     userStore.clearUser()
+    worldStore.clearWorlds()
   }
 
   const isAuthenticated = hasValidToken && hasUserData
@@ -116,6 +133,7 @@ router.beforeEach((to, _from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest)
   const requiresNoHomeAirport = to.matched.some(record => record.meta.requiresNoHomeAirport)
+  const requiresNoWorldHomeAirport = to.matched.some(record => record.meta.requiresNoWorldHomeAirport)
   const requiresDeveloperMode = to.matched.some(record => record.meta.requiresDeveloperMode)
   const requiresAdminMode = to.matched.some(record => record.meta.requiresAdminMode)
 
@@ -144,6 +162,14 @@ router.beforeEach((to, _from, next) => {
   } else if (requiresNoHomeAirport && hasHomeAirport) {
     // User already has home airport, redirect to dashboard
     next('/dashboard')
+  } else if (requiresNoWorldHomeAirport) {
+    // Check if current world has a home airport
+    const currentWorld = worldStore.currentPlayerWorld.value
+    if (currentWorld?.homeAirportId) {
+      next('/dashboard')
+      return
+    }
+    next()
   } else if (isAuthenticated && !hasHomeAirport && !requiresNoHomeAirport && to.path !== '/select-airport') {
     // User is authenticated but doesn't have home airport, redirect to selection
     next('/select-airport')

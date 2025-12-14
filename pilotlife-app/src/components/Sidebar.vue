@@ -7,6 +7,10 @@
       </div>
     </div>
 
+    <div v-if="worldStore.playerWorlds.value.length > 0" class="world-selector-container">
+      <WorldSelector />
+    </div>
+
     <nav class="sidebar-nav">
       <router-link to="/dashboard" class="nav-item" :class="{ active: isActive('/dashboard') }">
         <div class="nav-icon">
@@ -109,14 +113,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useSettingsStore } from '../stores/settings'
+import { useWorldStore } from '../stores/world'
+import WorldSelector from './WorldSelector.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
 const settingsStore = useSettingsStore()
+const worldStore = useWorldStore()
+
+onMounted(async () => {
+  // Load worlds data if not already loaded
+  if (worldStore.worlds.value.length === 0) {
+    await worldStore.loadWorlds()
+  }
+  if (worldStore.playerWorlds.value.length === 0) {
+    await worldStore.loadMyWorlds()
+  }
+})
 
 const isActive = (path: string) => route.path === path
 
@@ -168,6 +185,11 @@ const formattedBalance = computed(() => {
   font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
+}
+
+.world-selector-container {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .sidebar-nav {

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PilotLife.API.Services;
+using PilotLife.Application.Authorization;
 using PilotLife.Application.FlightTracking;
 using PilotLife.Database.Data;
 using Scalar.AspNetCore;
@@ -70,6 +71,8 @@ builder.Services.AddCors(options =>
 // Register services
 builder.Services.AddSingleton<AirportImportService>();
 builder.Services.AddScoped<IFlightTrackingService, FlightTrackingService>();
+builder.Services.AddScoped<IAuthorizationService, AuthorizationService>();
+builder.Services.AddScoped<DatabaseSeeder>();
 
 var app = builder.Build();
 
@@ -87,6 +90,10 @@ if (app.Environment.IsDevelopment())
     // Import airports from CSV if not already imported
     var airportImportService = app.Services.GetRequiredService<AirportImportService>();
     await airportImportService.ImportAirportsAsync();
+
+    // Seed default worlds and roles
+    var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+    await seeder.SeedAsync();
 }
 
 app.UseHttpsRedirection();
