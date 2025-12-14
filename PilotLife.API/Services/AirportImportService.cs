@@ -3,7 +3,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using PilotLife.Database.Data;
-using PilotLife.Database.Entities;
+using PilotLife.Domain.Entities;
 
 namespace PilotLife.API.Services;
 

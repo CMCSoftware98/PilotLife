@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PilotLife.Database\PilotLife.Database.csproj" />
+    <ProjectReference Include="..\PilotLife.Domain\PilotLife.Domain.csproj" />
+    <ProjectReference Include="..\PilotLife.Application\PilotLife.Application.csproj" />
   </ItemGroup>
 
 </Project>

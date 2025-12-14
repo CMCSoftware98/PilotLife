@@ -1,15 +1,13 @@
-namespace PilotLife.Database.Entities;
+using PilotLife.Domain.Common;
+using PilotLife.Domain.Enums;
 
-public enum AircraftRequestStatus
-{
-    Pending,
-    Approved,
-    Rejected
-}
+namespace PilotLife.Domain.Entities;
 
-public class AircraftRequest
+/// <summary>
+/// Represents a community-submitted aircraft request awaiting approval.
+/// </summary>
+public class AircraftRequest : BaseEntity
 {
-    public Guid Id { get; set; }
     public required string AircraftTitle { get; set; }
     public string? AtcType { get; set; }
     public string? AtcModel { get; set; }
@@ -25,11 +23,9 @@ public class AircraftRequest
     public Guid RequestedByUserId { get; set; }
     public User? RequestedByUser { get; set; }
 
-    public AircraftRequestStatus Status { get; set; }
+    public AircraftRequestStatus Status { get; set; } = AircraftRequestStatus.Pending;
     public string? ReviewNotes { get; set; }
     public Guid? ReviewedByUserId { get; set; }
     public User? ReviewedByUser { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-    public DateTime? ReviewedAt { get; set; }
+    public DateTimeOffset? ReviewedAt { get; set; }
 }

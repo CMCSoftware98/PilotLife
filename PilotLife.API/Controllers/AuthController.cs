@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PilotLife.API.Services;
 using PilotLife.Database.Data;
-using PilotLife.Database.Entities;
+using PilotLife.Domain.Entities;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -47,7 +47,6 @@ public class AuthController : ControllerBase
             PasswordHash = HashPassword(request.Password),
             ExperienceLevel = request.ExperienceLevel,
             NewsletterSubscribed = request.NewsletterSubscribed,
-            CreatedAt = DateTime.UtcNow,
             Balance = 10000m,
             TotalFlightMinutes = 0
         };
@@ -76,7 +75,7 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Invalid email or password" });
         }
 
-        user.LastLoginAt = DateTime.UtcNow;
+        user.LastLoginAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
 
         var tokens = _jwtService.GenerateTokens(user);
@@ -110,7 +109,7 @@ public class AuthController : ControllerBase
         var user = storedToken.User;
         var newTokens = _jwtService.GenerateTokens(user);
 
-        storedToken.RevokedAt = DateTime.UtcNow;
+        storedToken.RevokedAt = DateTimeOffset.UtcNow;
         storedToken.ReplacedByToken = newTokens.RefreshToken;
 
         await SaveRefreshToken(user.Id, newTokens.RefreshToken);
@@ -129,7 +128,7 @@ public class AuthController : ControllerBase
 
         if (storedToken != null && storedToken.IsActive)
         {
-            storedToken.RevokedAt = DateTime.UtcNow;
+            storedToken.RevokedAt = DateTimeOffset.UtcNow;
             await _context.SaveChangesAsync();
         }
 
@@ -216,8 +215,7 @@ public class AuthController : ControllerBase
         {
             Token = token,
             UserId = userId,
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays)
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays)
         };
 
         _context.RefreshTokens.Add(refreshToken);

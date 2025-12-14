@@ -1,5 +1,8 @@
-namespace PilotLife.Database.Entities;
+namespace PilotLife.Domain.Entities;
 
+/// <summary>
+/// Represents an airport. Uses int Id as this is reference data seeded from external sources.
+/// </summary>
 public class Airport
 {
     public int Id { get; set; }

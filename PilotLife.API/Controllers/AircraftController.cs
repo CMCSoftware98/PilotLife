@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PilotLife.Database.Data;
-using PilotLife.Database.Entities;
+using PilotLife.Domain.Entities;
 
 namespace PilotLife.API.Controllers;
 
@@ -80,8 +80,7 @@ public class AircraftController : ControllerBase
             EmptyWeightLbs = request.EmptyWeightLbs,
             CruiseSpeedKts = request.CruiseSpeedKts,
             SimulatorVersion = request.SimulatorVersion,
-            IsApproved = request.IsApproved,
-            CreatedAt = DateTime.UtcNow
+            IsApproved = request.IsApproved
         };
 
         _context.Aircraft.Add(aircraft);
@@ -129,7 +128,6 @@ public class AircraftController : ControllerBase
         aircraft.CruiseSpeedKts = request.CruiseSpeedKts;
         aircraft.SimulatorVersion = request.SimulatorVersion;
         aircraft.IsApproved = request.IsApproved;
-        aircraft.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
@@ -175,7 +173,7 @@ public class AircraftController : ControllerBase
             SimulatorVersion = aircraft.SimulatorVersion,
             IsApproved = aircraft.IsApproved,
             CreatedAt = aircraft.CreatedAt,
-            UpdatedAt = aircraft.UpdatedAt
+            ModifiedAt = aircraft.ModifiedAt
         };
     }
 }
@@ -227,6 +225,6 @@ public record AircraftResponse
     public double CruiseSpeedKts { get; init; }
     public string? SimulatorVersion { get; init; }
     public bool IsApproved { get; init; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? UpdatedAt { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? ModifiedAt { get; init; }
 }

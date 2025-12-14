@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PilotLife.Database.Data;
-using PilotLife.Database.Entities;
+using PilotLife.Domain.Entities;
 
 namespace PilotLife.API.Controllers;
 

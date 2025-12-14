@@ -1,8 +1,13 @@
-namespace PilotLife.Database.Entities;
+using PilotLife.Domain.Common;
 
-public class Aircraft
+namespace PilotLife.Domain.Entities;
+
+/// <summary>
+/// Represents an aircraft template/definition in the system.
+/// This is master data for available aircraft types.
+/// </summary>
+public class Aircraft : BaseEntity
 {
-    public Guid Id { get; set; }
     public required string Title { get; set; }
     public string? AtcType { get; set; }
     public string? AtcModel { get; set; }
@@ -15,6 +20,4 @@ public class Aircraft
     public double CruiseSpeedKts { get; set; }
     public string? SimulatorVersion { get; set; }
     public bool IsApproved { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
 }

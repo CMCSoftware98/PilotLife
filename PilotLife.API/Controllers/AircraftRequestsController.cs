@@ -2,7 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PilotLife.Database.Data;
-using PilotLife.Database.Entities;
+using PilotLife.Domain.Entities;
+using PilotLife.Domain.Enums;
 using System.Security.Claims;
 
 namespace PilotLife.API.Controllers;
@@ -100,8 +101,7 @@ public class AircraftRequestsController : ControllerBase
             CruiseSpeedKts = request.CruiseSpeedKts,
             SimulatorVersion = request.SimulatorVersion,
             RequestedByUserId = userId.Value,
-            Status = AircraftRequestStatus.Pending,
-            CreatedAt = DateTime.UtcNow
+            Status = AircraftRequestStatus.Pending
         };
 
         _context.AircraftRequests.Add(aircraftRequest);
@@ -157,8 +157,7 @@ public class AircraftRequestsController : ControllerBase
             EmptyWeightLbs = aircraftRequest.EmptyWeightLbs,
             CruiseSpeedKts = aircraftRequest.CruiseSpeedKts,
             SimulatorVersion = aircraftRequest.SimulatorVersion,
-            IsApproved = true,
-            CreatedAt = DateTime.UtcNow
+            IsApproved = true
         };
 
         _context.Aircraft.Add(aircraft);
@@ -166,7 +165,7 @@ public class AircraftRequestsController : ControllerBase
         aircraftRequest.Status = AircraftRequestStatus.Approved;
         aircraftRequest.ReviewNotes = request.ReviewNotes;
         aircraftRequest.ReviewedByUserId = userId;
-        aircraftRequest.ReviewedAt = DateTime.UtcNow;
+        aircraftRequest.ReviewedAt = DateTimeOffset.UtcNow;
 
         await _context.SaveChangesAsync();
 
@@ -204,7 +203,7 @@ public class AircraftRequestsController : ControllerBase
         aircraftRequest.Status = AircraftRequestStatus.Rejected;
         aircraftRequest.ReviewNotes = request.ReviewNotes;
         aircraftRequest.ReviewedByUserId = userId;
-        aircraftRequest.ReviewedAt = DateTime.UtcNow;
+        aircraftRequest.ReviewedAt = DateTimeOffset.UtcNow;
 
         await _context.SaveChangesAsync();
 
@@ -310,6 +309,6 @@ public record AircraftRequestResponse
     public required string Status { get; init; }
     public string? ReviewNotes { get; init; }
     public string? RequestedByUserName { get; init; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? ReviewedAt { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? ReviewedAt { get; init; }
 }

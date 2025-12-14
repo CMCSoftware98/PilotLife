@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PilotLife.Database.Data;
-using PilotLife.Database.Entities;
+using PilotLife.Domain.Entities;
 
 namespace PilotLife.API.Controllers;
 
@@ -31,7 +31,7 @@ public class JobsController : ControllerBase
             .Where(j => j.DepartureAirportId == airportId
                         && !j.IsCompleted
                         && j.AssignedToUserId == null
-                        && j.ExpiresAt > DateTime.UtcNow);
+                        && j.ExpiresAt > DateTimeOffset.UtcNow);
 
         if (!string.IsNullOrWhiteSpace(cargoType))
         {
@@ -147,7 +147,7 @@ public class JobsController : ControllerBase
             return BadRequest(new { message = "Job is already assigned" });
         }
 
-        if (job.ExpiresAt <= DateTime.UtcNow)
+        if (job.ExpiresAt <= DateTimeOffset.UtcNow)
         {
             return BadRequest(new { message = "Job has expired" });
         }
@@ -261,7 +261,7 @@ public record JobDto
     public double DistanceNm { get; init; }
     public int EstimatedFlightTimeMinutes { get; init; }
     public required string RequiredAircraftType { get; init; }
-    public DateTime ExpiresAt { get; init; }
+    public DateTimeOffset ExpiresAt { get; init; }
 }
 
 public record JobAirportDto

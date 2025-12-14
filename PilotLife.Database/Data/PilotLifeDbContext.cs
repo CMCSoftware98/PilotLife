@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using PilotLife.Database.Entities;
+using PilotLife.Domain.Common;
+using PilotLife.Domain.Entities;
+using PilotLife.Domain.Enums;
 
 namespace PilotLife.Database.Data;
 
@@ -15,21 +17,87 @@ public class PilotLifeDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Aircraft> Aircraft => Set<Aircraft>();
     public DbSet<AircraftRequest> AircraftRequests => Set<AircraftRequest>();
+    public DbSet<TrackedFlight> TrackedFlights => Set<TrackedFlight>();
+    public DbSet<FlightJob> FlightJobs => Set<FlightJob>();
+    public DbSet<FlightFinancials> FlightFinancials => Set<FlightFinancials>();
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        UpdateTimestamps();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    public override int SaveChanges()
+    {
+        UpdateTimestamps();
+        return base.SaveChanges();
+    }
+
+    private void UpdateTimestamps()
+    {
+        var entries = ChangeTracker.Entries<BaseEntity>();
+
+        foreach (var entry in entries)
+        {
+            if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.ModifiedAt = DateTimeOffset.UtcNow;
+            }
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // Apply base entity configuration to all BaseEntity-derived types
+        ConfigureBaseEntity<User>(modelBuilder);
+        ConfigureBaseEntity<Job>(modelBuilder);
+        ConfigureBaseEntity<RefreshToken>(modelBuilder);
+        ConfigureBaseEntity<Aircraft>(modelBuilder);
+        ConfigureBaseEntity<AircraftRequest>(modelBuilder);
+        ConfigureBaseEntity<TrackedFlight>(modelBuilder);
+        ConfigureBaseEntity<FlightJob>(modelBuilder);
+        ConfigureBaseEntity<FlightFinancials>(modelBuilder);
+
+        ConfigureUser(modelBuilder);
+        ConfigureAirport(modelBuilder);
+        ConfigureJob(modelBuilder);
+        ConfigureRefreshToken(modelBuilder);
+        ConfigureAircraft(modelBuilder);
+        ConfigureAircraftRequest(modelBuilder);
+        ConfigureTrackedFlight(modelBuilder);
+        ConfigureFlightJob(modelBuilder);
+        ConfigureFlightFinancials(modelBuilder);
+    }
+
+    private static void ConfigureBaseEntity<T>(ModelBuilder modelBuilder) where T : BaseEntity
+    {
+        modelBuilder.Entity<T>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            // UUID v7 generated on application side
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedNever();
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamptz")
+                .IsRequired();
+
+            entity.Property(e => e.ModifiedAt)
+                .HasColumnName("modified_at")
+                .HasColumnType("timestamptz");
+        });
+    }
+
+    private static void ConfigureUser(ModelBuilder modelBuilder)
+    {
         modelBuilder.Entity<User>(entity =>
         {
             entity.ToTable("users");
-
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .HasDefaultValueSql("uuidv7()")
-                .ValueGeneratedOnAdd();
 
             entity.Property(e => e.FirstName)
                 .HasColumnName("first_name")
@@ -65,15 +133,9 @@ public class PilotLifeDbContext : DbContext
                 .HasColumnName("newsletter_subscribed")
                 .HasDefaultValue(false);
 
-            entity.Property(e => e.CreatedAt)
-                .HasColumnName("created_at")
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-            entity.Property(e => e.UpdatedAt)
-                .HasColumnName("updated_at");
-
             entity.Property(e => e.LastLoginAt)
-                .HasColumnName("last_login_at");
+                .HasColumnName("last_login_at")
+                .HasColumnType("timestamptz");
 
             entity.Property(e => e.CurrentAirportId)
                 .HasColumnName("current_airport_id");
@@ -98,8 +160,16 @@ public class PilotLifeDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.HomeAirportId)
                 .OnDelete(DeleteBehavior.SetNull);
-        });
 
+            entity.HasMany(e => e.RefreshTokens)
+                .WithOne(e => e.User)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureAirport(ModelBuilder modelBuilder)
+    {
         modelBuilder.Entity<Airport>(entity =>
         {
             entity.ToTable("airports");
@@ -152,17 +222,13 @@ public class PilotLifeDbContext : DbContext
             entity.HasIndex(e => e.IataCode);
             entity.HasIndex(e => e.Name);
         });
+    }
 
+    private static void ConfigureJob(ModelBuilder modelBuilder)
+    {
         modelBuilder.Entity<Job>(entity =>
         {
             entity.ToTable("jobs");
-
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .HasDefaultValueSql("uuidv7()")
-                .ValueGeneratedOnAdd();
 
             entity.Property(e => e.DepartureAirportId)
                 .HasColumnName("departure_airport_id")
@@ -195,12 +261,9 @@ public class PilotLifeDbContext : DbContext
                 .HasMaxLength(50)
                 .IsRequired();
 
-            entity.Property(e => e.CreatedAt)
-                .HasColumnName("created_at")
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
             entity.Property(e => e.ExpiresAt)
-                .HasColumnName("expires_at");
+                .HasColumnName("expires_at")
+                .HasColumnType("timestamptz");
 
             entity.Property(e => e.IsCompleted)
                 .HasColumnName("is_completed")
@@ -228,17 +291,13 @@ public class PilotLifeDbContext : DbContext
             entity.HasIndex(e => e.IsCompleted);
             entity.HasIndex(e => e.AssignedToUserId);
         });
+    }
 
+    private static void ConfigureRefreshToken(ModelBuilder modelBuilder)
+    {
         modelBuilder.Entity<RefreshToken>(entity =>
         {
             entity.ToTable("refresh_tokens");
-
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .HasDefaultValueSql("uuidv7()")
-                .ValueGeneratedOnAdd();
 
             entity.Property(e => e.Token)
                 .HasColumnName("token")
@@ -251,38 +310,32 @@ public class PilotLifeDbContext : DbContext
                 .HasColumnName("user_id")
                 .IsRequired();
 
-            entity.Property(e => e.CreatedAt)
-                .HasColumnName("created_at")
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
             entity.Property(e => e.ExpiresAt)
                 .HasColumnName("expires_at")
+                .HasColumnType("timestamptz")
                 .IsRequired();
 
             entity.Property(e => e.RevokedAt)
-                .HasColumnName("revoked_at");
+                .HasColumnName("revoked_at")
+                .HasColumnType("timestamptz");
 
             entity.Property(e => e.ReplacedByToken)
                 .HasColumnName("replaced_by_token");
 
-            entity.HasOne(e => e.User)
-                .WithMany()
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
             entity.HasIndex(e => e.UserId);
-        });
 
+            // Ignore computed properties
+            entity.Ignore(e => e.IsExpired);
+            entity.Ignore(e => e.IsRevoked);
+            entity.Ignore(e => e.IsActive);
+        });
+    }
+
+    private static void ConfigureAircraft(ModelBuilder modelBuilder)
+    {
         modelBuilder.Entity<Aircraft>(entity =>
         {
             entity.ToTable("aircraft");
-
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .HasDefaultValueSql("uuidv7()")
-                .ValueGeneratedOnAdd();
 
             entity.Property(e => e.Title)
                 .HasColumnName("title")
@@ -330,25 +383,14 @@ public class PilotLifeDbContext : DbContext
             entity.Property(e => e.IsApproved)
                 .HasColumnName("is_approved")
                 .HasDefaultValue(false);
-
-            entity.Property(e => e.CreatedAt)
-                .HasColumnName("created_at")
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-            entity.Property(e => e.UpdatedAt)
-                .HasColumnName("updated_at");
         });
+    }
 
+    private static void ConfigureAircraftRequest(ModelBuilder modelBuilder)
+    {
         modelBuilder.Entity<AircraftRequest>(entity =>
         {
             entity.ToTable("aircraft_requests");
-
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .HasDefaultValueSql("uuidv7()")
-                .ValueGeneratedOnAdd();
 
             entity.Property(e => e.AircraftTitle)
                 .HasColumnName("aircraft_title")
@@ -407,12 +449,9 @@ public class PilotLifeDbContext : DbContext
             entity.Property(e => e.ReviewedByUserId)
                 .HasColumnName("reviewed_by_user_id");
 
-            entity.Property(e => e.CreatedAt)
-                .HasColumnName("created_at")
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
             entity.Property(e => e.ReviewedAt)
-                .HasColumnName("reviewed_at");
+                .HasColumnName("reviewed_at")
+                .HasColumnType("timestamptz");
 
             entity.HasOne(e => e.RequestedByUser)
                 .WithMany()

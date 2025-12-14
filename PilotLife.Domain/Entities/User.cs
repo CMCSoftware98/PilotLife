@@ -1,8 +1,12 @@
-namespace PilotLife.Database.Entities;
+using PilotLife.Domain.Common;
 
-public class User
+namespace PilotLife.Domain.Entities;
+
+/// <summary>
+/// Represents a user account in the system.
+/// </summary>
+public class User : BaseEntity
 {
-    public Guid Id { get; set; }
     public required string FirstName { get; set; }
     public required string LastName { get; set; }
     public required string Email { get; set; }
@@ -10,9 +14,7 @@ public class User
     public string? ExperienceLevel { get; set; }
     public bool EmailVerified { get; set; }
     public bool NewsletterSubscribed { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
-    public DateTime? LastLoginAt { get; set; }
+    public DateTimeOffset? LastLoginAt { get; set; }
 
     // Flight sim properties
     public int? CurrentAirportId { get; set; }
@@ -21,4 +23,7 @@ public class User
     public Airport? HomeAirport { get; set; }
     public decimal Balance { get; set; }
     public int TotalFlightMinutes { get; set; }
+
+    // Navigation properties
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }
