@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PilotLife.Database.Data;
@@ -11,9 +12,11 @@ using PilotLife.Database.Data;
 namespace PilotLife.Database.Migrations
 {
     [DbContext(typeof(PilotLifeDbContext))]
-    partial class PilotLifeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251214184024_AddAircraftOwnershipEntities")]
+    partial class AddAircraftOwnershipEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -218,147 +221,6 @@ namespace PilotLife.Database.Migrations
                     b.ToTable("aircraft_components", (string)null);
                 });
 
-            modelBuilder.Entity("PilotLife.Domain.Entities.AircraftDealer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AirportIcao")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("airport_icao");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DealerType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("dealer_type");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("description");
-
-                    b.Property<decimal?>("FinancingDownPaymentPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("financing_down_payment_percent");
-
-                    b.Property<decimal?>("FinancingInterestRate")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("numeric(5,4)")
-                        .HasColumnName("financing_interest_rate");
-
-                    b.Property<int>("InventoryRefreshDays")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(7)
-                        .HasColumnName("inventory_refresh_days");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<DateTimeOffset>("LastInventoryRefresh")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("last_inventory_refresh");
-
-                    b.Property<int>("MaxCondition")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(100)
-                        .HasColumnName("max_condition");
-
-                    b.Property<int>("MaxHours")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(10000)
-                        .HasColumnName("max_hours");
-
-                    b.Property<int>("MaxInventory")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(20)
-                        .HasColumnName("max_inventory");
-
-                    b.Property<int>("MinCondition")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(60)
-                        .HasColumnName("min_condition");
-
-                    b.Property<int>("MinHours")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("min_hours");
-
-                    b.Property<int>("MinInventory")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(5)
-                        .HasColumnName("min_inventory");
-
-                    b.Property<DateTimeOffset?>("ModifiedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("modified_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<bool>("OffersFinancing")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("offers_financing");
-
-                    b.Property<decimal>("PriceMultiplier")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasDefaultValue(1.0m)
-                        .HasColumnName("price_multiplier");
-
-                    b.Property<double>("ReputationScore")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("double precision")
-                        .HasDefaultValue(3.0)
-                        .HasColumnName("reputation_score");
-
-                    b.Property<int>("TotalSales")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("total_sales");
-
-                    b.Property<Guid>("WorldId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("world_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AirportIcao");
-
-                    b.HasIndex("DealerType");
-
-                    b.HasIndex("WorldId");
-
-                    b.HasIndex("WorldId", "AirportIcao");
-
-                    b.ToTable("aircraft_dealers", (string)null);
-                });
-
             modelBuilder.Entity("PilotLife.Domain.Entities.AircraftModification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -534,138 +396,6 @@ namespace PilotLife.Database.Migrations
                     b.ToTable("aircraft_modifications", (string)null);
                 });
 
-            modelBuilder.Entity("PilotLife.Domain.Entities.AircraftPurchase", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("ConditionAtPurchase")
-                        .HasColumnType("integer")
-                        .HasColumnName("condition_at_purchase");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid?>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
-
-                    b.Property<Guid?>("DealerInventoryId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_inventory_id");
-
-                    b.Property<decimal>("DownPayment")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("down_payment");
-
-                    b.Property<decimal?>("FinancingInterestRate")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("numeric(5,4)")
-                        .HasColumnName("financing_interest_rate");
-
-                    b.Property<int?>("FinancingTermMonths")
-                        .HasColumnType("integer")
-                        .HasColumnName("financing_term_months");
-
-                    b.Property<int>("FlightMinutesAtPurchase")
-                        .HasColumnType("integer")
-                        .HasColumnName("flight_minutes_at_purchase");
-
-                    b.Property<bool>("IncludedWarranty")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("included_warranty");
-
-                    b.Property<bool>("IsFinanced")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_financed");
-
-                    b.Property<Guid?>("LoanId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("loan_id");
-
-                    b.Property<DateTimeOffset?>("ModifiedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("modified_at");
-
-                    b.Property<decimal?>("MonthlyPayment")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("monthly_payment");
-
-                    b.Property<Guid>("OwnedAircraftId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owned_aircraft_id");
-
-                    b.Property<Guid>("PlayerWorldId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("player_world_id");
-
-                    b.Property<string>("PurchaseLocationIcao")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("purchase_location_icao");
-
-                    b.Property<decimal>("PurchasePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("purchase_price");
-
-                    b.Property<DateTimeOffset>("PurchasedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("purchased_at");
-
-                    b.Property<Guid?>("SellerPlayerWorldId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("seller_player_world_id");
-
-                    b.Property<Guid?>("TradeInAircraftId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("trade_in_aircraft_id");
-
-                    b.Property<decimal>("TradeInValue")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("trade_in_value");
-
-                    b.Property<int?>("WarrantyMonths")
-                        .HasColumnType("integer")
-                        .HasColumnName("warranty_months");
-
-                    b.Property<Guid>("WorldId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("world_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DealerId");
-
-                    b.HasIndex("DealerInventoryId");
-
-                    b.HasIndex("OwnedAircraftId");
-
-                    b.HasIndex("PlayerWorldId");
-
-                    b.HasIndex("PurchasedAt");
-
-                    b.HasIndex("SellerPlayerWorldId");
-
-                    b.HasIndex("TradeInAircraftId");
-
-                    b.HasIndex("WorldId");
-
-                    b.HasIndex("PlayerWorldId", "PurchasedAt");
-
-                    b.ToTable("aircraft_purchases", (string)null);
-                });
-
             modelBuilder.Entity("PilotLife.Domain.Entities.AircraftRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -833,129 +563,6 @@ namespace PilotLife.Database.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("airports", (string)null);
-                });
-
-            modelBuilder.Entity("PilotLife.Domain.Entities.DealerInventory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AircraftId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("aircraft_id");
-
-                    b.Property<string>("AvionicsPackage")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("avionics_package");
-
-                    b.Property<decimal>("BasePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("base_price");
-
-                    b.Property<int>("Condition")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(100)
-                        .HasColumnName("condition");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
-
-                    b.Property<DateTimeOffset?>("ExpiresAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("expires_at");
-
-                    b.Property<bool>("HasWarranty")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("has_warranty");
-
-                    b.Property<string>("IncludedModifications")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("included_modifications");
-
-                    b.Property<bool>("IsNew")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_new");
-
-                    b.Property<bool>("IsSold")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_sold");
-
-                    b.Property<decimal>("ListPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("list_price");
-
-                    b.Property<DateTimeOffset>("ListedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("listed_at");
-
-                    b.Property<DateTimeOffset?>("ModifiedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("modified_at");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("notes");
-
-                    b.Property<string>("Registration")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("registration");
-
-                    b.Property<DateTimeOffset?>("SoldAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("sold_at");
-
-                    b.Property<int>("TotalCycles")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("total_cycles");
-
-                    b.Property<int>("TotalFlightMinutes")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("total_flight_minutes");
-
-                    b.Property<int?>("WarrantyMonths")
-                        .HasColumnType("integer")
-                        .HasColumnName("warranty_months");
-
-                    b.Property<Guid>("WorldId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("world_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AircraftId");
-
-                    b.HasIndex("DealerId");
-
-                    b.HasIndex("IsSold");
-
-                    b.HasIndex("WorldId");
-
-                    b.HasIndex("DealerId", "IsSold");
-
-                    b.ToTable("dealer_inventory", (string)null);
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.FlightFinancials", b =>
@@ -2361,17 +1968,6 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("World");
                 });
 
-            modelBuilder.Entity("PilotLife.Domain.Entities.AircraftDealer", b =>
-                {
-                    b.HasOne("PilotLife.Domain.Entities.World", "World")
-                        .WithMany()
-                        .HasForeignKey("WorldId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("World");
-                });
-
             modelBuilder.Entity("PilotLife.Domain.Entities.AircraftModification", b =>
                 {
                     b.HasOne("PilotLife.Domain.Entities.OwnedAircraft", "OwnedAircraft")
@@ -2387,61 +1983,6 @@ namespace PilotLife.Database.Migrations
                         .IsRequired();
 
                     b.Navigation("OwnedAircraft");
-
-                    b.Navigation("World");
-                });
-
-            modelBuilder.Entity("PilotLife.Domain.Entities.AircraftPurchase", b =>
-                {
-                    b.HasOne("PilotLife.Domain.Entities.AircraftDealer", "Dealer")
-                        .WithMany()
-                        .HasForeignKey("DealerId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("PilotLife.Domain.Entities.DealerInventory", "DealerInventory")
-                        .WithMany()
-                        .HasForeignKey("DealerInventoryId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("PilotLife.Domain.Entities.OwnedAircraft", "OwnedAircraft")
-                        .WithMany()
-                        .HasForeignKey("OwnedAircraftId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PilotLife.Domain.Entities.PlayerWorld", "PlayerWorld")
-                        .WithMany()
-                        .HasForeignKey("PlayerWorldId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PilotLife.Domain.Entities.PlayerWorld", "SellerPlayerWorld")
-                        .WithMany()
-                        .HasForeignKey("SellerPlayerWorldId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("PilotLife.Domain.Entities.OwnedAircraft", "TradeInAircraft")
-                        .WithMany()
-                        .HasForeignKey("TradeInAircraftId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("PilotLife.Domain.Entities.World", "World")
-                        .WithMany()
-                        .HasForeignKey("WorldId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Dealer");
-
-                    b.Navigation("DealerInventory");
-
-                    b.Navigation("OwnedAircraft");
-
-                    b.Navigation("PlayerWorld");
-
-                    b.Navigation("SellerPlayerWorld");
-
-                    b.Navigation("TradeInAircraft");
 
                     b.Navigation("World");
                 });
@@ -2462,33 +2003,6 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("RequestedByUser");
 
                     b.Navigation("ReviewedByUser");
-                });
-
-            modelBuilder.Entity("PilotLife.Domain.Entities.DealerInventory", b =>
-                {
-                    b.HasOne("PilotLife.Domain.Entities.Aircraft", "Aircraft")
-                        .WithMany()
-                        .HasForeignKey("AircraftId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PilotLife.Domain.Entities.AircraftDealer", "Dealer")
-                        .WithMany("Inventory")
-                        .HasForeignKey("DealerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PilotLife.Domain.Entities.World", "World")
-                        .WithMany()
-                        .HasForeignKey("WorldId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Aircraft");
-
-                    b.Navigation("Dealer");
-
-                    b.Navigation("World");
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.FlightFinancials", b =>
@@ -2758,11 +2272,6 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("LastModifiedByUser");
 
                     b.Navigation("World");
-                });
-
-            modelBuilder.Entity("PilotLife.Domain.Entities.AircraftDealer", b =>
-                {
-                    b.Navigation("Inventory");
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.OwnedAircraft", b =>

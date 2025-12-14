@@ -31,6 +31,17 @@ public class PilotLifeDbContext : DbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
 
+    // Aircraft ownership entities
+    public DbSet<OwnedAircraft> OwnedAircraft => Set<OwnedAircraft>();
+    public DbSet<AircraftComponent> AircraftComponents => Set<AircraftComponent>();
+    public DbSet<AircraftModification> AircraftModifications => Set<AircraftModification>();
+    public DbSet<MaintenanceLog> MaintenanceLogs => Set<MaintenanceLog>();
+
+    // Marketplace entities
+    public DbSet<AircraftDealer> AircraftDealers => Set<AircraftDealer>();
+    public DbSet<DealerInventory> DealerInventory => Set<DealerInventory>();
+    public DbSet<AircraftPurchase> AircraftPurchases => Set<AircraftPurchase>();
+
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         UpdateTimestamps();
@@ -74,6 +85,13 @@ public class PilotLifeDbContext : DbContext
         ConfigureBaseEntity<PlayerWorld>(modelBuilder);
         ConfigureBaseEntity<Role>(modelBuilder);
         ConfigureBaseEntity<UserRole>(modelBuilder);
+        ConfigureBaseEntity<OwnedAircraft>(modelBuilder);
+        ConfigureBaseEntity<AircraftComponent>(modelBuilder);
+        ConfigureBaseEntity<AircraftModification>(modelBuilder);
+        ConfigureBaseEntity<MaintenanceLog>(modelBuilder);
+        ConfigureBaseEntity<AircraftDealer>(modelBuilder);
+        ConfigureBaseEntity<DealerInventory>(modelBuilder);
+        ConfigureBaseEntity<AircraftPurchase>(modelBuilder);
 
         ConfigureUser(modelBuilder);
         ConfigureAirport(modelBuilder);
@@ -90,6 +108,13 @@ public class PilotLifeDbContext : DbContext
         ConfigureRole(modelBuilder);
         ConfigureRolePermission(modelBuilder);
         ConfigureUserRole(modelBuilder);
+        ConfigureOwnedAircraft(modelBuilder);
+        ConfigureAircraftComponent(modelBuilder);
+        ConfigureAircraftModification(modelBuilder);
+        ConfigureMaintenanceLog(modelBuilder);
+        ConfigureAircraftDealer(modelBuilder);
+        ConfigureDealerInventory(modelBuilder);
+        ConfigureAircraftPurchase(modelBuilder);
     }
 
     private static void ConfigureBaseEntity<T>(ModelBuilder modelBuilder) where T : BaseEntity
@@ -1183,6 +1208,883 @@ public class PilotLifeDbContext : DbContext
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.RoleId);
             entity.HasIndex(e => new { e.UserId, e.RoleId, e.WorldId });
+        });
+    }
+
+    private static void ConfigureOwnedAircraft(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OwnedAircraft>(entity =>
+        {
+            entity.ToTable("owned_aircraft");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.PlayerWorldId)
+                .HasColumnName("player_world_id")
+                .IsRequired();
+
+            entity.Property(e => e.AircraftId)
+                .HasColumnName("aircraft_id")
+                .IsRequired();
+
+            entity.Property(e => e.Registration)
+                .HasColumnName("registration")
+                .HasMaxLength(20);
+
+            entity.Property(e => e.Nickname)
+                .HasColumnName("nickname")
+                .HasMaxLength(100);
+
+            entity.Property(e => e.Condition)
+                .HasColumnName("condition")
+                .HasDefaultValue(100);
+
+            entity.Property(e => e.TotalFlightMinutes)
+                .HasColumnName("total_flight_minutes")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.TotalCycles)
+                .HasColumnName("total_cycles")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.HoursSinceLastInspection)
+                .HasColumnName("hours_since_last_inspection")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.CurrentLocationIcao)
+                .HasColumnName("current_location_icao")
+                .HasMaxLength(10)
+                .IsRequired();
+
+            entity.Property(e => e.LastMovedAt)
+                .HasColumnName("last_moved_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.IsInMaintenance)
+                .HasColumnName("is_in_maintenance")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IsInUse)
+                .HasColumnName("is_in_use")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IsListedForRental)
+                .HasColumnName("is_listed_for_rental")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IsListedForSale)
+                .HasColumnName("is_listed_for_sale")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.PurchasePrice)
+                .HasColumnName("purchase_price")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.PurchasedAt)
+                .HasColumnName("purchased_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.WasPurchasedNew)
+                .HasColumnName("was_purchased_new")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.HasWarranty)
+                .HasColumnName("has_warranty")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.WarrantyExpiresAt)
+                .HasColumnName("warranty_expires_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.HasInsurance)
+                .HasColumnName("has_insurance")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.InsuranceExpiresAt)
+                .HasColumnName("insurance_expires_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.InsurancePremium)
+                .HasColumnName("insurance_premium")
+                .HasPrecision(18, 2);
+
+            // Ignore computed properties
+            entity.Ignore(e => e.IsAirworthy);
+            entity.Ignore(e => e.TotalFlightHours);
+            entity.Ignore(e => e.InspectionDue);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Owner)
+                .WithMany()
+                .HasForeignKey(e => e.PlayerWorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Aircraft)
+                .WithMany()
+                .HasForeignKey(e => e.AircraftId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.PlayerWorldId);
+            entity.HasIndex(e => e.AircraftId);
+            entity.HasIndex(e => e.CurrentLocationIcao);
+            entity.HasIndex(e => new { e.WorldId, e.PlayerWorldId });
+        });
+    }
+
+    private static void ConfigureAircraftComponent(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AircraftComponent>(entity =>
+        {
+            entity.ToTable("aircraft_components");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.OwnedAircraftId)
+                .HasColumnName("owned_aircraft_id")
+                .IsRequired();
+
+            entity.Property(e => e.ComponentType)
+                .HasColumnName("component_type")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.SerialNumber)
+                .HasColumnName("serial_number")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.Manufacturer)
+                .HasColumnName("manufacturer")
+                .HasMaxLength(100);
+
+            entity.Property(e => e.Model)
+                .HasColumnName("model")
+                .HasMaxLength(100);
+
+            entity.Property(e => e.Condition)
+                .HasColumnName("condition")
+                .HasDefaultValue(100);
+
+            entity.Property(e => e.OperatingMinutes)
+                .HasColumnName("operating_minutes")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.Cycles)
+                .HasColumnName("cycles")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.TimeSinceOverhaul)
+                .HasColumnName("time_since_overhaul")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.TimeBetweenOverhaul)
+                .HasColumnName("time_between_overhaul");
+
+            entity.Property(e => e.IsLifeLimited)
+                .HasColumnName("is_life_limited")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.LifeLimitMinutes)
+                .HasColumnName("life_limit_minutes");
+
+            entity.Property(e => e.LifeLimitCycles)
+                .HasColumnName("life_limit_cycles");
+
+            entity.Property(e => e.InstalledAt)
+                .HasColumnName("installed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.AircraftHoursAtInstall)
+                .HasColumnName("aircraft_hours_at_install")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.IsServiceable)
+                .HasColumnName("is_serviceable")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(1000);
+
+            // Ignore computed properties
+            entity.Ignore(e => e.OperatingHours);
+            entity.Ignore(e => e.TimeSinceOverhaulHours);
+            entity.Ignore(e => e.TboPercentUsed);
+            entity.Ignore(e => e.IsTboApproaching);
+            entity.Ignore(e => e.IsTboExceeded);
+            entity.Ignore(e => e.LifePercentUsed);
+            entity.Ignore(e => e.NeedsAttention);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.OwnedAircraft)
+                .WithMany(a => a.Components)
+                .HasForeignKey(e => e.OwnedAircraftId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.OwnedAircraftId);
+            entity.HasIndex(e => new { e.OwnedAircraftId, e.ComponentType });
+        });
+    }
+
+    private static void ConfigureAircraftModification(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AircraftModification>(entity =>
+        {
+            entity.ToTable("aircraft_modifications");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.OwnedAircraftId)
+                .HasColumnName("owned_aircraft_id")
+                .IsRequired();
+
+            entity.Property(e => e.ModificationType)
+                .HasColumnName("modification_type")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(100);
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.InstalledAt)
+                .HasColumnName("installed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.InstallationCost)
+                .HasColumnName("installation_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.InstalledAtAirport)
+                .HasColumnName("installed_at_airport")
+                .HasMaxLength(10);
+
+            entity.Property(e => e.IsActive)
+                .HasColumnName("is_active")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.IsRemovable)
+                .HasColumnName("is_removable")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.RemovalCost)
+                .HasColumnName("removal_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.CargoCapacityChangeLbs)
+                .HasColumnName("cargo_capacity_change_lbs");
+
+            entity.Property(e => e.PassengerCapacityChange)
+                .HasColumnName("passenger_capacity_change");
+
+            entity.Property(e => e.RangeChangeNm)
+                .HasColumnName("range_change_nm");
+
+            entity.Property(e => e.CruiseSpeedChangeKts)
+                .HasColumnName("cruise_speed_change_kts");
+
+            entity.Property(e => e.FuelConsumptionMultiplier)
+                .HasColumnName("fuel_consumption_multiplier")
+                .HasPrecision(5, 2)
+                .HasDefaultValue(1.0m);
+
+            entity.Property(e => e.TakeoffDistanceMultiplier)
+                .HasColumnName("takeoff_distance_multiplier")
+                .HasPrecision(5, 2)
+                .HasDefaultValue(1.0m);
+
+            entity.Property(e => e.LandingDistanceMultiplier)
+                .HasColumnName("landing_distance_multiplier")
+                .HasPrecision(5, 2)
+                .HasDefaultValue(1.0m);
+
+            entity.Property(e => e.EmptyWeightChangeLbs)
+                .HasColumnName("empty_weight_change_lbs");
+
+            entity.Property(e => e.MaxGrossWeightChangeLbs)
+                .HasColumnName("max_gross_weight_change_lbs");
+
+            entity.Property(e => e.EnablesWaterOperations)
+                .HasColumnName("enables_water_operations")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.EnablesSnowOperations)
+                .HasColumnName("enables_snow_operations")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.EnablesStolOperations)
+                .HasColumnName("enables_stol_operations")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.EnablesIfrOperations)
+                .HasColumnName("enables_ifr_operations")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.EnablesNightOperations)
+                .HasColumnName("enables_night_operations")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.EnablesKnownIcing)
+                .HasColumnName("enables_known_icing")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.AdditionalMaintenanceCostPerHour)
+                .HasColumnName("additional_maintenance_cost_per_hour")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.SpecialInspectionIntervalMinutes)
+                .HasColumnName("special_inspection_interval_minutes");
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(1000);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.OwnedAircraft)
+                .WithMany(a => a.Modifications)
+                .HasForeignKey(e => e.OwnedAircraftId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.OwnedAircraftId);
+            entity.HasIndex(e => new { e.OwnedAircraftId, e.ModificationType });
+        });
+    }
+
+    private static void ConfigureMaintenanceLog(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MaintenanceLog>(entity =>
+        {
+            entity.ToTable("maintenance_logs");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.OwnedAircraftId)
+                .HasColumnName("owned_aircraft_id")
+                .IsRequired();
+
+            entity.Property(e => e.AircraftComponentId)
+                .HasColumnName("aircraft_component_id");
+
+            entity.Property(e => e.MaintenanceType)
+                .HasColumnName("maintenance_type")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.Title)
+                .HasColumnName("title")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.StartedAt)
+                .HasColumnName("started_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.EstimatedDurationHours)
+                .HasColumnName("estimated_duration_hours");
+
+            entity.Property(e => e.ActualDurationHours)
+                .HasColumnName("actual_duration_hours");
+
+            entity.Property(e => e.AircraftFlightMinutesAtService)
+                .HasColumnName("aircraft_flight_minutes_at_service");
+
+            entity.Property(e => e.AircraftCyclesAtService)
+                .HasColumnName("aircraft_cycles_at_service");
+
+            entity.Property(e => e.PerformedAtAirport)
+                .HasColumnName("performed_at_airport")
+                .HasMaxLength(10)
+                .IsRequired();
+
+            entity.Property(e => e.FacilityName)
+                .HasColumnName("facility_name")
+                .HasMaxLength(200);
+
+            entity.Property(e => e.LaborCost)
+                .HasColumnName("labor_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.PartsCost)
+                .HasColumnName("parts_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.CoveredByWarranty)
+                .HasColumnName("covered_by_warranty")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.CoveredByInsurance)
+                .HasColumnName("covered_by_insurance")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IsCompleted)
+                .HasColumnName("is_completed")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.ConditionImprovement)
+                .HasColumnName("condition_improvement");
+
+            entity.Property(e => e.ResultingCondition)
+                .HasColumnName("resulting_condition");
+
+            entity.Property(e => e.PartsReplaced)
+                .HasColumnName("parts_replaced")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.SquawksFound)
+                .HasColumnName("squawks_found")
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.DeferredItems)
+                .HasColumnName("deferred_items")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.AirworthinessDirectiveNumber)
+                .HasColumnName("airworthiness_directive_number")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.ServiceBulletinNumber)
+                .HasColumnName("service_bulletin_number")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.MechanicName)
+                .HasColumnName("mechanic_name")
+                .HasMaxLength(100);
+
+            entity.Property(e => e.MechanicLicense)
+                .HasColumnName("mechanic_license")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.InspectorName)
+                .HasColumnName("inspector_name")
+                .HasMaxLength(100);
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.NextServiceDueMinutes)
+                .HasColumnName("next_service_due_minutes");
+
+            entity.Property(e => e.NextServiceDueDate)
+                .HasColumnName("next_service_due_date")
+                .HasColumnType("timestamptz");
+
+            // Ignore computed property
+            entity.Ignore(e => e.TotalCost);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.OwnedAircraft)
+                .WithMany(a => a.MaintenanceLogs)
+                .HasForeignKey(e => e.OwnedAircraftId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.AircraftComponent)
+                .WithMany()
+                .HasForeignKey(e => e.AircraftComponentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.OwnedAircraftId);
+            entity.HasIndex(e => e.AircraftComponentId);
+            entity.HasIndex(e => e.MaintenanceType);
+            entity.HasIndex(e => new { e.OwnedAircraftId, e.StartedAt });
+        });
+    }
+
+    private static void ConfigureAircraftDealer(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AircraftDealer>(entity =>
+        {
+            entity.ToTable("aircraft_dealers");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.AirportIcao)
+                .HasColumnName("airport_icao")
+                .HasMaxLength(10)
+                .IsRequired();
+
+            entity.Property(e => e.DealerType)
+                .HasColumnName("dealer_type")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.MinInventory)
+                .HasColumnName("min_inventory")
+                .HasDefaultValue(5);
+
+            entity.Property(e => e.MaxInventory)
+                .HasColumnName("max_inventory")
+                .HasDefaultValue(20);
+
+            entity.Property(e => e.InventoryRefreshDays)
+                .HasColumnName("inventory_refresh_days")
+                .HasDefaultValue(7);
+
+            entity.Property(e => e.PriceMultiplier)
+                .HasColumnName("price_multiplier")
+                .HasPrecision(5, 2)
+                .HasDefaultValue(1.0m);
+
+            entity.Property(e => e.OffersFinancing)
+                .HasColumnName("offers_financing")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.FinancingDownPaymentPercent)
+                .HasColumnName("financing_down_payment_percent")
+                .HasPrecision(5, 2);
+
+            entity.Property(e => e.FinancingInterestRate)
+                .HasColumnName("financing_interest_rate")
+                .HasPrecision(5, 4);
+
+            entity.Property(e => e.MinCondition)
+                .HasColumnName("min_condition")
+                .HasDefaultValue(60);
+
+            entity.Property(e => e.MaxCondition)
+                .HasColumnName("max_condition")
+                .HasDefaultValue(100);
+
+            entity.Property(e => e.MinHours)
+                .HasColumnName("min_hours")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.MaxHours)
+                .HasColumnName("max_hours")
+                .HasDefaultValue(10000);
+
+            entity.Property(e => e.ReputationScore)
+                .HasColumnName("reputation_score")
+                .HasDefaultValue(3.0);
+
+            entity.Property(e => e.TotalSales)
+                .HasColumnName("total_sales")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.LastInventoryRefresh)
+                .HasColumnName("last_inventory_refresh")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.IsActive)
+                .HasColumnName("is_active")
+                .HasDefaultValue(true);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.AirportIcao);
+            entity.HasIndex(e => new { e.WorldId, e.AirportIcao });
+            entity.HasIndex(e => e.DealerType);
+        });
+    }
+
+    private static void ConfigureDealerInventory(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<DealerInventory>(entity =>
+        {
+            entity.ToTable("dealer_inventory");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.DealerId)
+                .HasColumnName("dealer_id")
+                .IsRequired();
+
+            entity.Property(e => e.AircraftId)
+                .HasColumnName("aircraft_id")
+                .IsRequired();
+
+            entity.Property(e => e.Registration)
+                .HasColumnName("registration")
+                .HasMaxLength(20);
+
+            entity.Property(e => e.Condition)
+                .HasColumnName("condition")
+                .HasDefaultValue(100);
+
+            entity.Property(e => e.TotalFlightMinutes)
+                .HasColumnName("total_flight_minutes")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.TotalCycles)
+                .HasColumnName("total_cycles")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.BasePrice)
+                .HasColumnName("base_price")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.ListPrice)
+                .HasColumnName("list_price")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.IsNew)
+                .HasColumnName("is_new")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.HasWarranty)
+                .HasColumnName("has_warranty")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.WarrantyMonths)
+                .HasColumnName("warranty_months");
+
+            entity.Property(e => e.AvionicsPackage)
+                .HasColumnName("avionics_package")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.IncludedModifications)
+                .HasColumnName("included_modifications")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.ListedAt)
+                .HasColumnName("listed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.ExpiresAt)
+                .HasColumnName("expires_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.IsSold)
+                .HasColumnName("is_sold")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.SoldAt)
+                .HasColumnName("sold_at")
+                .HasColumnType("timestamptz");
+
+            // Ignore computed properties
+            entity.Ignore(e => e.IsActive);
+            entity.Ignore(e => e.TotalFlightHours);
+            entity.Ignore(e => e.DiscountPercent);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Dealer)
+                .WithMany(d => d.Inventory)
+                .HasForeignKey(e => e.DealerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Aircraft)
+                .WithMany()
+                .HasForeignKey(e => e.AircraftId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.DealerId);
+            entity.HasIndex(e => e.AircraftId);
+            entity.HasIndex(e => e.IsSold);
+            entity.HasIndex(e => new { e.DealerId, e.IsSold });
+        });
+    }
+
+    private static void ConfigureAircraftPurchase(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AircraftPurchase>(entity =>
+        {
+            entity.ToTable("aircraft_purchases");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.PlayerWorldId)
+                .HasColumnName("player_world_id")
+                .IsRequired();
+
+            entity.Property(e => e.OwnedAircraftId)
+                .HasColumnName("owned_aircraft_id")
+                .IsRequired();
+
+            entity.Property(e => e.DealerId)
+                .HasColumnName("dealer_id");
+
+            entity.Property(e => e.DealerInventoryId)
+                .HasColumnName("dealer_inventory_id");
+
+            entity.Property(e => e.SellerPlayerWorldId)
+                .HasColumnName("seller_player_world_id");
+
+            entity.Property(e => e.PurchasePrice)
+                .HasColumnName("purchase_price")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.DownPayment)
+                .HasColumnName("down_payment")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.TradeInValue)
+                .HasColumnName("trade_in_value")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.TradeInAircraftId)
+                .HasColumnName("trade_in_aircraft_id");
+
+            entity.Property(e => e.IsFinanced)
+                .HasColumnName("is_financed")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.LoanId)
+                .HasColumnName("loan_id");
+
+            entity.Property(e => e.FinancingInterestRate)
+                .HasColumnName("financing_interest_rate")
+                .HasPrecision(5, 4);
+
+            entity.Property(e => e.FinancingTermMonths)
+                .HasColumnName("financing_term_months");
+
+            entity.Property(e => e.MonthlyPayment)
+                .HasColumnName("monthly_payment")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.PurchaseLocationIcao)
+                .HasColumnName("purchase_location_icao")
+                .HasMaxLength(10)
+                .IsRequired();
+
+            entity.Property(e => e.PurchasedAt)
+                .HasColumnName("purchased_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.ConditionAtPurchase)
+                .HasColumnName("condition_at_purchase");
+
+            entity.Property(e => e.FlightMinutesAtPurchase)
+                .HasColumnName("flight_minutes_at_purchase");
+
+            entity.Property(e => e.IncludedWarranty)
+                .HasColumnName("included_warranty")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.WarrantyMonths)
+                .HasColumnName("warranty_months");
+
+            // Ignore computed properties
+            entity.Ignore(e => e.NetAmount);
+            entity.Ignore(e => e.AmountFinanced);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.PlayerWorld)
+                .WithMany()
+                .HasForeignKey(e => e.PlayerWorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.OwnedAircraft)
+                .WithMany()
+                .HasForeignKey(e => e.OwnedAircraftId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Dealer)
+                .WithMany()
+                .HasForeignKey(e => e.DealerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.DealerInventory)
+                .WithMany()
+                .HasForeignKey(e => e.DealerInventoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.SellerPlayerWorld)
+                .WithMany()
+                .HasForeignKey(e => e.SellerPlayerWorldId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.TradeInAircraft)
+                .WithMany()
+                .HasForeignKey(e => e.TradeInAircraftId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.PlayerWorldId);
+            entity.HasIndex(e => e.OwnedAircraftId);
+            entity.HasIndex(e => e.DealerId);
+            entity.HasIndex(e => e.PurchasedAt);
+            entity.HasIndex(e => new { e.PlayerWorldId, e.PurchasedAt });
         });
     }
 }

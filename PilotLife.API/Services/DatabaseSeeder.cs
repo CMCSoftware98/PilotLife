@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using PilotLife.Database.Data;
 using PilotLife.Domain.Entities;
@@ -26,6 +28,7 @@ public class DatabaseSeeder
     {
         await SeedWorldsAsync();
         await SeedRolesAsync();
+        await SeedAdminUserAsync();
     }
 
     /// <summary>
@@ -103,6 +106,65 @@ public class DatabaseSeeder
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Seeded {Count} system roles.", roles.Count);
+    }
+
+    /// <summary>
+    /// Seeds the default admin user if it doesn't exist.
+    /// </summary>
+    private async Task SeedAdminUserAsync()
+    {
+        var adminEmail = "admin@pilotlife.com";
+
+        if (await _context.Users.AnyAsync(u => u.Email == adminEmail))
+        {
+            _logger.LogInformation("Admin user already exists, skipping.");
+            return;
+        }
+
+        _logger.LogInformation("Seeding admin user...");
+
+        var superAdminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "SuperAdmin");
+        if (superAdminRole == null)
+        {
+            _logger.LogWarning("SuperAdmin role not found, cannot create admin user.");
+            return;
+        }
+
+        var adminUser = new User
+        {
+            FirstName = "Admin",
+            LastName = "User",
+            Email = adminEmail,
+            PasswordHash = HashPassword("123456"),
+            EmailVerified = true,
+            Balance = 1000000m
+        };
+
+        _context.Users.Add(adminUser);
+        await _context.SaveChangesAsync();
+
+        var userRole = new UserRole
+        {
+            UserId = adminUser.Id,
+            RoleId = superAdminRole.Id,
+            WorldId = null, // Global
+            GrantedAt = DateTimeOffset.UtcNow,
+            GrantedByUserId = adminUser.Id // Self-granted for system user
+        };
+
+        _context.UserRoles.Add(userRole);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Seeded admin user with SuperAdmin role.");
+    }
+
+    /// <summary>
+    /// Hashes a password using SHA256.
+    /// </summary>
+    private static string HashPassword(string password)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
+        return Convert.ToBase64String(bytes);
     }
 
     /// <summary>
