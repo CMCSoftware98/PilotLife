@@ -20,6 +20,7 @@
 #include "SimConnectManager.h"
 #include "ProcessDetector.h"
 #include "FlightData.h"
+#include <IXNetSystem.h>
 
 // Configuration
 constexpr int DEFAULT_PORT = 5050;
@@ -64,6 +65,12 @@ int main(int argc, char* argv[]) {
             printUsage(argv[0]);
             return 0;
         }
+    }
+
+    // Initialize network system (required for IXWebSocket on Windows)
+    if (!ix::initNetSystem()) {
+        std::cerr << "Failed to initialize network system" << std::endl;
+        return 1;
     }
 
     // Set up signal handler for graceful shutdown
@@ -190,6 +197,9 @@ int main(int argc, char* argv[]) {
     simConnect.stopDispatchLoop();
     simConnect.disconnect();
     wsServer.stop();
+
+    // Cleanup network system
+    ix::uninitNetSystem();
 
     std::cout << "Goodbye!" << std::endl;
     return 0;

@@ -29,6 +29,16 @@ enum DATA_REQUEST_ID {
 #pragma pack(push, 1)
 struct SimConnectFlightData {
     char title[256];              // TITLE
+    char atcType[64];             // ATC TYPE (aircraft type e.g., "Boeing 737")
+    char atcModel[64];            // ATC MODEL (model variant e.g., "B738")
+    char atcId[64];               // ATC ID (tail number e.g., "N12345")
+    char atcAirline[64];          // ATC AIRLINE (airline name)
+    char atcFlightNumber[64];     // ATC FLIGHT NUMBER
+    char category[256];           // CATEGORY (e.g., "Airplane", "Helicopter")
+    int engineType;               // ENGINE TYPE (0=Piston, 1=Jet, 2=None, 3=Helo, 4=Rocket, 5=Turboprop)
+    int numberOfEngines;          // NUMBER OF ENGINES
+    double maxGrossWeight;        // MAX GROSS WEIGHT (pounds)
+    double cruiseSpeed;           // DESIGN CRUISE ALT (knots)
     double latitude;              // PLANE LATITUDE (degrees)
     double longitude;             // PLANE LONGITUDE (degrees)
     double altitudeIndicated;     // INDICATED ALTITUDE (feet)
@@ -54,29 +64,54 @@ struct SimConnectFlightData {
 
 // JSON-serializable flight data for WebSocket transmission
 struct FlightDataJson {
+    // Aircraft metadata
     std::string aircraftTitle;
+    std::string atcType;
+    std::string atcModel;
+    std::string atcId;
+    std::string atcAirline;
+    std::string atcFlightNumber;
+    std::string category;
+    std::string engineTypeStr;
+    int engineType;
+    int numberOfEngines;
+    double maxGrossWeightLbs;
+    double cruiseSpeedKts;
+    double emptyWeightLbs;
+
+    // Position
     double latitude;
     double longitude;
     double altitudeIndicated;
     double altitudeTrue;
     double altitudeAGL;
+
+    // Speed
     double airspeedIndicated;
     double airspeedTrue;
     double groundSpeed;
     double machNumber;
+
+    // Heading
     double headingMagnetic;
     double headingTrue;
     double track;
+
+    // Weight & Fuel
     double fuelLbs;
     double fuelKgs;
     double payloadLbs;
     double payloadKgs;
     double totalWeightLbs;
     double totalWeightKgs;
+
+    // Radios
     std::string com1Frequency;
     std::string com2Frequency;
     std::string nav1Frequency;
     std::string nav2Frequency;
+
+    // Metadata
     std::string timestamp;
     std::string simulatorVersion;
 

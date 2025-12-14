@@ -9,8 +9,11 @@ import SkillsView from '../views/SkillsView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import ConceptView from '../views/ConceptView.vue'
+import DevView from '../views/DevView.vue'
+import AdminView from '../views/AdminView.vue'
 import AppLayout from '../layouts/AppLayout.vue'
 import { useUserStore } from '../stores/user'
+import { useSettingsStore } from '../stores/settings'
 import { api } from '../services/api'
 
 const routes = [
@@ -72,6 +75,18 @@ const routes = [
         name: 'concept',
         component: ConceptView,
       },
+      {
+        path: 'dev',
+        name: 'dev',
+        component: DevView,
+        meta: { requiresDeveloperMode: true },
+      },
+      {
+        path: 'admin',
+        name: 'admin',
+        component: AdminView,
+        meta: { requiresAdminMode: true },
+      },
     ],
   },
 ]
@@ -83,6 +98,7 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   const userStore = useUserStore()
+  const settingsStore = useSettingsStore()
   userStore.loadUser()
 
   const hasValidToken = api.auth.isAuthenticated()
@@ -100,6 +116,20 @@ router.beforeEach((to, _from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest)
   const requiresNoHomeAirport = to.matched.some(record => record.meta.requiresNoHomeAirport)
+  const requiresDeveloperMode = to.matched.some(record => record.meta.requiresDeveloperMode)
+  const requiresAdminMode = to.matched.some(record => record.meta.requiresAdminMode)
+
+  // Check developer mode requirement
+  if (requiresDeveloperMode && !settingsStore.settings.value.developerMode) {
+    next('/dashboard')
+    return
+  }
+
+  // Check admin mode requirement
+  if (requiresAdminMode && !settingsStore.settings.value.adminMode) {
+    next('/dashboard')
+    return
+  }
 
   if (requiresAuth && !isAuthenticated) {
     // Redirect to login if trying to access protected route

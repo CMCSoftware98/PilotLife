@@ -45,9 +45,42 @@ void SimConnectManager::setupDataDefinitions() {
     // Define all the SimVars we want to receive
     // Order MUST match SimConnectFlightData struct in FlightData.h
 
+    // Aircraft metadata (strings)
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "TITLE", nullptr, SIMCONNECT_DATATYPE_STRING256);
 
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "ATC TYPE", nullptr, SIMCONNECT_DATATYPE_STRING64);
+
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "ATC MODEL", nullptr, SIMCONNECT_DATATYPE_STRING64);
+
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "ATC ID", nullptr, SIMCONNECT_DATATYPE_STRING64);
+
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "ATC AIRLINE", nullptr, SIMCONNECT_DATATYPE_STRING64);
+
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "ATC FLIGHT NUMBER", nullptr, SIMCONNECT_DATATYPE_STRING64);
+
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "CATEGORY", nullptr, SIMCONNECT_DATATYPE_STRING256);
+
+    // Aircraft metadata (numeric)
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "ENGINE TYPE", "enum");
+
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "NUMBER OF ENGINES", "number");
+
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "MAX GROSS WEIGHT", "pounds");
+
+    SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
+        "DESIGN CRUISE ALT", "knots");
+
+    // Position
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "PLANE LATITUDE", "degrees");
 
@@ -63,6 +96,7 @@ void SimConnectManager::setupDataDefinitions() {
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "PLANE ALT ABOVE GROUND", "feet");
 
+    // Speed
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "AIRSPEED INDICATED", "knots");
 
@@ -75,6 +109,7 @@ void SimConnectManager::setupDataDefinitions() {
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "AIRSPEED MACH", "mach");
 
+    // Heading
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "HEADING INDICATOR", "degrees");
 
@@ -84,6 +119,7 @@ void SimConnectManager::setupDataDefinitions() {
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "GPS GROUND TRUE TRACK", "degrees");
 
+    // Fuel & Weight
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "FUEL TOTAL QUANTITY", "gallons");
 
@@ -96,6 +132,7 @@ void SimConnectManager::setupDataDefinitions() {
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "EMPTY WEIGHT", "pounds");
 
+    // Radios
     SimConnect_AddToDataDefinition(m_hSimConnect, DEFINITION_FLIGHT_DATA,
         "COM ACTIVE FREQUENCY:1", "Hz");
 

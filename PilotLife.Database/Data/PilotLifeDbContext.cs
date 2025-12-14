@@ -13,6 +13,8 @@ public class PilotLifeDbContext : DbContext
     public DbSet<Airport> Airports => Set<Airport>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Aircraft> Aircraft => Set<Aircraft>();
+    public DbSet<AircraftRequest> AircraftRequests => Set<AircraftRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -269,6 +271,162 @@ public class PilotLifeDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => e.UserId);
+        });
+
+        modelBuilder.Entity<Aircraft>(entity =>
+        {
+            entity.ToTable("aircraft");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .HasDefaultValueSql("uuidv7()")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Title)
+                .HasColumnName("title")
+                .HasMaxLength(256)
+                .IsRequired();
+
+            entity.HasIndex(e => e.Title)
+                .IsUnique();
+
+            entity.Property(e => e.AtcType)
+                .HasColumnName("atc_type")
+                .HasMaxLength(64);
+
+            entity.Property(e => e.AtcModel)
+                .HasColumnName("atc_model")
+                .HasMaxLength(64);
+
+            entity.Property(e => e.Category)
+                .HasColumnName("category")
+                .HasMaxLength(256);
+
+            entity.Property(e => e.EngineType)
+                .HasColumnName("engine_type");
+
+            entity.Property(e => e.EngineTypeStr)
+                .HasColumnName("engine_type_str")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.NumberOfEngines)
+                .HasColumnName("number_of_engines");
+
+            entity.Property(e => e.MaxGrossWeightLbs)
+                .HasColumnName("max_gross_weight_lbs");
+
+            entity.Property(e => e.EmptyWeightLbs)
+                .HasColumnName("empty_weight_lbs");
+
+            entity.Property(e => e.CruiseSpeedKts)
+                .HasColumnName("cruise_speed_kts");
+
+            entity.Property(e => e.SimulatorVersion)
+                .HasColumnName("simulator_version")
+                .HasMaxLength(20);
+
+            entity.Property(e => e.IsApproved)
+                .HasColumnName("is_approved")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("created_at")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<AircraftRequest>(entity =>
+        {
+            entity.ToTable("aircraft_requests");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .HasDefaultValueSql("uuidv7()")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.AircraftTitle)
+                .HasColumnName("aircraft_title")
+                .HasMaxLength(256)
+                .IsRequired();
+
+            entity.Property(e => e.AtcType)
+                .HasColumnName("atc_type")
+                .HasMaxLength(64);
+
+            entity.Property(e => e.AtcModel)
+                .HasColumnName("atc_model")
+                .HasMaxLength(64);
+
+            entity.Property(e => e.Category)
+                .HasColumnName("category")
+                .HasMaxLength(256);
+
+            entity.Property(e => e.EngineType)
+                .HasColumnName("engine_type");
+
+            entity.Property(e => e.EngineTypeStr)
+                .HasColumnName("engine_type_str")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.NumberOfEngines)
+                .HasColumnName("number_of_engines");
+
+            entity.Property(e => e.MaxGrossWeightLbs)
+                .HasColumnName("max_gross_weight_lbs");
+
+            entity.Property(e => e.EmptyWeightLbs)
+                .HasColumnName("empty_weight_lbs");
+
+            entity.Property(e => e.CruiseSpeedKts)
+                .HasColumnName("cruise_speed_kts");
+
+            entity.Property(e => e.SimulatorVersion)
+                .HasColumnName("simulator_version")
+                .HasMaxLength(20);
+
+            entity.Property(e => e.RequestedByUserId)
+                .HasColumnName("requested_by_user_id")
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(AircraftRequestStatus.Pending);
+
+            entity.Property(e => e.ReviewNotes)
+                .HasColumnName("review_notes")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.ReviewedByUserId)
+                .HasColumnName("reviewed_by_user_id");
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("created_at")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(e => e.ReviewedAt)
+                .HasColumnName("reviewed_at");
+
+            entity.HasOne(e => e.RequestedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.RequestedByUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.ReviewedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.RequestedByUserId);
+            entity.HasIndex(e => e.AircraftTitle);
         });
     }
 }

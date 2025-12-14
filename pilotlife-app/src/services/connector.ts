@@ -1,29 +1,48 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export interface FlightData {
+    // Aircraft metadata
     aircraftTitle: string;
+    atcType: string;
+    atcModel: string;
+    atcId: string;
+    atcAirline: string;
+    atcFlightNumber: string;
+    category: string;
+    engineType: number;
+    engineTypeStr: string;
+    numberOfEngines: number;
+    maxGrossWeightLbs: number;
+    cruiseSpeedKts: number;
+    emptyWeightLbs: number;
+    // Position
     latitude: number;
     longitude: number;
     altitudeIndicated: number;
     altitudeTrue: number;
     altitudeAGL: number;
+    // Speed
     airspeedIndicated: number;
     airspeedTrue: number;
     groundSpeed: number;
     machNumber: number;
+    // Heading
     headingMagnetic: number;
     headingTrue: number;
     track: number;
+    // Weight & Fuel
     fuelLbs: number;
     fuelKgs: number;
     payloadLbs: number;
     payloadKgs: number;
     totalWeightLbs: number;
     totalWeightKgs: number;
+    // Radios
     com1Frequency: string;
     com2Frequency: string;
     nav1Frequency: string;
     nav2Frequency: string;
+    // Metadata
     timestamp: string;
     simulatorVersion: string;
 }

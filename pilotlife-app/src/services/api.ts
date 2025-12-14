@@ -114,6 +114,58 @@ interface CompleteJobResponse {
   newLocation: string;
 }
 
+interface CreateAircraftRequestData {
+  aircraftTitle: string;
+  atcType?: string;
+  atcModel?: string;
+  category?: string;
+  engineType: number;
+  engineTypeStr?: string;
+  numberOfEngines: number;
+  maxGrossWeightLbs: number;
+  emptyWeightLbs: number;
+  cruiseSpeedKts: number;
+  simulatorVersion?: string;
+}
+
+interface AircraftRequestResponse {
+  id: string;
+  aircraftTitle: string;
+  atcType?: string;
+  atcModel?: string;
+  category?: string;
+  engineType: number;
+  engineTypeStr?: string;
+  numberOfEngines: number;
+  maxGrossWeightLbs: number;
+  emptyWeightLbs: number;
+  cruiseSpeedKts: number;
+  simulatorVersion?: string;
+  status: string;
+  reviewNotes?: string;
+  requestedByUserName?: string;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
+interface AircraftResponse {
+  id: string;
+  title: string;
+  atcType?: string;
+  atcModel?: string;
+  category?: string;
+  engineType: number;
+  engineTypeStr?: string;
+  numberOfEngines: number;
+  maxGrossWeightLbs: number;
+  emptyWeightLbs: number;
+  cruiseSpeedKts: number;
+  simulatorVersion?: string;
+  isApproved: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 // Token management
 const TOKEN_KEY = 'pilotlife_access_token';
 const REFRESH_TOKEN_KEY = 'pilotlife_refresh_token';
@@ -356,6 +408,66 @@ export const api = {
         body: JSON.stringify({ userId }),
       }, true),
   },
+
+  aircraftRequests: {
+    list: (status?: string): Promise<ApiResponse<AircraftRequestResponse[]>> => {
+      const params = status ? `?status=${status}` : '';
+      return request<AircraftRequestResponse[]>(`/api/aircraftrequests${params}`, {}, true);
+    },
+
+    get: (id: string): Promise<ApiResponse<AircraftRequestResponse>> =>
+      request<AircraftRequestResponse>(`/api/aircraftrequests/${id}`, {}, true),
+
+    create: (data: CreateAircraftRequestData): Promise<ApiResponse<AircraftRequestResponse>> =>
+      request<AircraftRequestResponse>('/api/aircraftrequests', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }, true),
+
+    approve: (id: string, reviewNotes?: string): Promise<ApiResponse<AircraftRequestResponse>> =>
+      request<AircraftRequestResponse>(`/api/aircraftrequests/${id}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ reviewNotes }),
+      }, true),
+
+    reject: (id: string, reviewNotes?: string): Promise<ApiResponse<AircraftRequestResponse>> =>
+      request<AircraftRequestResponse>(`/api/aircraftrequests/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reviewNotes }),
+      }, true),
+
+    delete: (id: string): Promise<ApiResponse<void>> =>
+      request<void>(`/api/aircraftrequests/${id}`, {
+        method: 'DELETE',
+      }, true),
+  },
+
+  aircraft: {
+    list: (approvedOnly?: boolean): Promise<ApiResponse<AircraftResponse[]>> => {
+      const params = approvedOnly !== undefined ? `?approvedOnly=${approvedOnly}` : '';
+      return request<AircraftResponse[]>(`/api/aircraft${params}`, {}, true);
+    },
+
+    get: (id: string): Promise<ApiResponse<AircraftResponse>> =>
+      request<AircraftResponse>(`/api/aircraft/${id}`, {}, true),
+
+    create: (data: Omit<AircraftResponse, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<AircraftResponse>> =>
+      request<AircraftResponse>('/api/aircraft', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }, true),
+
+    update: (id: string, data: Omit<AircraftResponse, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<AircraftResponse>> =>
+      request<AircraftResponse>(`/api/aircraft/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }, true),
+
+    delete: (id: string): Promise<ApiResponse<void>> =>
+      request<void>(`/api/aircraft/${id}`, {
+        method: 'DELETE',
+      }, true),
+  },
 };
 
 export type {
@@ -369,5 +481,8 @@ export type {
   AuthResponse,
   UserResponse,
   RegisterRequest,
-  LoginRequest
+  LoginRequest,
+  AircraftRequestResponse,
+  AircraftResponse,
+  CreateAircraftRequestData
 };

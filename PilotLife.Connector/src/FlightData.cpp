@@ -7,19 +7,51 @@
 // Constants for unit conversion
 constexpr double LBS_TO_KGS = 0.453592;
 
+// Helper to convert engine type enum to string
+static std::string engineTypeToString(int engineType) {
+    switch (engineType) {
+        case 0: return "Piston";
+        case 1: return "Jet";
+        case 2: return "None";
+        case 3: return "Helo (Turbine)";
+        case 4: return "Rocket";
+        case 5: return "Turboprop";
+        default: return "Unknown";
+    }
+}
+
 FlightDataJson FlightDataJson::fromSimConnect(const SimConnectFlightData& data, const std::string& simVersion) {
     FlightDataJson json;
 
+    // Aircraft metadata
     json.aircraftTitle = data.title;
+    json.atcType = data.atcType;
+    json.atcModel = data.atcModel;
+    json.atcId = data.atcId;
+    json.atcAirline = data.atcAirline;
+    json.atcFlightNumber = data.atcFlightNumber;
+    json.category = data.category;
+    json.engineType = data.engineType;
+    json.engineTypeStr = engineTypeToString(data.engineType);
+    json.numberOfEngines = data.numberOfEngines;
+    json.maxGrossWeightLbs = data.maxGrossWeight;
+    json.cruiseSpeedKts = data.cruiseSpeed;
+    json.emptyWeightLbs = data.emptyWeight;
+
+    // Position
     json.latitude = data.latitude;
     json.longitude = data.longitude;
     json.altitudeIndicated = data.altitudeIndicated;
     json.altitudeTrue = data.altitudeTrue;
     json.altitudeAGL = data.altitudeAGL;
+
+    // Speed
     json.airspeedIndicated = data.airspeedIndicated;
     json.airspeedTrue = data.airspeedTrue;
     json.groundSpeed = data.groundSpeed;
     json.machNumber = data.machNumber;
+
+    // Heading
     json.headingMagnetic = data.headingMagnetic;
     json.headingTrue = data.headingTrue;
     json.track = data.gpsGroundTrack;
@@ -77,29 +109,48 @@ std::string FlightDataJson::toJson() const {
     oss << std::fixed << std::setprecision(6);
 
     oss << "{";
+    // Aircraft metadata
     oss << "\"aircraftTitle\":\"" << aircraftTitle << "\",";
-    oss << "\"latitude\":" << latitude << ",";
+    oss << "\"atcType\":\"" << atcType << "\",";
+    oss << "\"atcModel\":\"" << atcModel << "\",";
+    oss << "\"atcId\":\"" << atcId << "\",";
+    oss << "\"atcAirline\":\"" << atcAirline << "\",";
+    oss << "\"atcFlightNumber\":\"" << atcFlightNumber << "\",";
+    oss << "\"category\":\"" << category << "\",";
+    oss << "\"engineType\":" << engineType << ",";
+    oss << "\"engineTypeStr\":\"" << engineTypeStr << "\",";
+    oss << "\"numberOfEngines\":" << numberOfEngines << ",";
+    oss << "\"maxGrossWeightLbs\":" << std::setprecision(1) << maxGrossWeightLbs << ",";
+    oss << "\"cruiseSpeedKts\":" << cruiseSpeedKts << ",";
+    oss << "\"emptyWeightLbs\":" << emptyWeightLbs << ",";
+    // Position
+    oss << "\"latitude\":" << std::setprecision(6) << latitude << ",";
     oss << "\"longitude\":" << longitude << ",";
     oss << "\"altitudeIndicated\":" << std::setprecision(1) << altitudeIndicated << ",";
     oss << "\"altitudeTrue\":" << altitudeTrue << ",";
     oss << "\"altitudeAGL\":" << altitudeAGL << ",";
+    // Speed
     oss << "\"airspeedIndicated\":" << airspeedIndicated << ",";
     oss << "\"airspeedTrue\":" << airspeedTrue << ",";
     oss << "\"groundSpeed\":" << groundSpeed << ",";
     oss << "\"machNumber\":" << std::setprecision(3) << machNumber << ",";
+    // Heading
     oss << "\"headingMagnetic\":" << std::setprecision(1) << headingMagnetic << ",";
     oss << "\"headingTrue\":" << headingTrue << ",";
     oss << "\"track\":" << track << ",";
+    // Weight & Fuel
     oss << "\"fuelLbs\":" << fuelLbs << ",";
     oss << "\"fuelKgs\":" << fuelKgs << ",";
     oss << "\"payloadLbs\":" << payloadLbs << ",";
     oss << "\"payloadKgs\":" << payloadKgs << ",";
     oss << "\"totalWeightLbs\":" << totalWeightLbs << ",";
     oss << "\"totalWeightKgs\":" << totalWeightKgs << ",";
+    // Radios
     oss << "\"com1Frequency\":\"" << com1Frequency << "\",";
     oss << "\"com2Frequency\":\"" << com2Frequency << "\",";
     oss << "\"nav1Frequency\":\"" << nav1Frequency << "\",";
     oss << "\"nav2Frequency\":\"" << nav2Frequency << "\",";
+    // Metadata
     oss << "\"timestamp\":\"" << timestamp << "\",";
     oss << "\"simulatorVersion\":\"" << simulatorVersion << "\"";
     oss << "}";
