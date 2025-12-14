@@ -15,7 +15,7 @@
           </div>
           <div class="stat-content">
             <span class="stat-label">Balance</span>
-            <span class="stat-value">${{ formatBalance(userStore.user.value?.balance || 0) }}</span>
+            <span class="stat-value">${{ formatBalance(currentBalance) }}</span>
           </div>
         </div>
         <div class="stat-card">
@@ -27,7 +27,7 @@
           </div>
           <div class="stat-content">
             <span class="stat-label">Flight Time</span>
-            <span class="stat-value">{{ formatFlightTime(userStore.user.value?.totalFlightMinutes || 0) }}</span>
+            <span class="stat-value">{{ formatFlightTime(currentFlightMinutes) }}</span>
           </div>
         </div>
         <div class="stat-card">
@@ -127,17 +127,29 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import { useWorldStore } from '../stores/world'
 
 const router = useRouter()
 const userStore = useUserStore()
+const worldStore = useWorldStore()
 
+onMounted(async () => {
+  // Refresh world data to ensure we have the latest
+  if (worldStore.playerWorlds.value.length === 0) {
+    await worldStore.loadMyWorlds()
+  }
+})
+
+// World-specific data from currentPlayerWorld
+const currentBalance = computed(() => worldStore.currentPlayerWorld.value?.balance ?? 0)
+const currentFlightMinutes = computed(() => worldStore.currentPlayerWorld.value?.totalFlightMinutes ?? 0)
 const currentLocation = computed(() => {
-  if (userStore.user.value?.currentAirport) {
-    const airport = userStore.user.value.currentAirport
-    return airport.iataCode || airport.ident
+  const playerWorld = worldStore.currentPlayerWorld.value
+  if (playerWorld?.currentAirportIdent) {
+    return playerWorld.currentAirportIdent
   }
   return 'Not Set'
 })

@@ -2,8 +2,9 @@
   <div class="world-selection">
     <div class="selection-container">
       <div class="header">
-        <h1 class="title">Choose Your World</h1>
-        <p class="subtitle">Select a world to play in. Each world has different difficulty settings affecting the economy.</p>
+        <h1 class="title">Choose Your Starting World</h1>
+        <p class="subtitle">Each world has different economy settings. We recommend starting with <strong>Medium</strong> for a balanced experience.</p>
+        <p class="hint">You can join other worlds anytime from the sidebar — you're not locked into this choice!</p>
       </div>
 
       <div v-if="isLoading" class="loading-state">
@@ -22,15 +23,23 @@
 
       <div v-else class="worlds-grid">
         <div
-          v-for="world in worlds"
+          v-for="world in sortedWorlds"
           :key="world.id"
           class="world-card"
           :class="{
             selected: selectedWorld?.id === world.id,
-            joined: isWorldJoined(world.id)
+            joined: isWorldJoined(world.id),
+            recommended: world.isDefault
           }"
           @click="selectWorld(world)"
         >
+          <div v-if="world.isDefault" class="recommended-banner">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            Recommended
+          </div>
+
           <div class="world-badge" :class="world.difficulty.toLowerCase()">
             {{ world.difficulty }}
           </div>
@@ -45,15 +54,15 @@
             </div>
             <div class="stat">
               <span class="stat-label">Job Payouts</span>
-              <span class="stat-value">{{ formatMultiplier(world.jobPayoutMultiplier) }}</span>
+              <span class="stat-value" :class="getMultiplierClass(world.jobPayoutMultiplier)">{{ formatMultiplier(world.jobPayoutMultiplier) }}</span>
             </div>
             <div class="stat">
               <span class="stat-label">Aircraft Prices</span>
-              <span class="stat-value">{{ formatMultiplier(world.aircraftPriceMultiplier) }}</span>
+              <span class="stat-value" :class="getMultiplierClass(world.aircraftPriceMultiplier, true)">{{ formatMultiplier(world.aircraftPriceMultiplier) }}</span>
             </div>
             <div class="stat">
               <span class="stat-label">Maintenance Costs</span>
-              <span class="stat-value">{{ formatMultiplier(world.maintenanceCostMultiplier) }}</span>
+              <span class="stat-value" :class="getMultiplierClass(world.maintenanceCostMultiplier, true)">{{ formatMultiplier(world.maintenanceCostMultiplier) }}</span>
             </div>
           </div>
 
@@ -66,12 +75,6 @@
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
               <span>{{ world.currentPlayers }} players</span>
-            </div>
-            <div v-if="world.isDefault" class="default-badge">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-              </svg>
-              Recommended
             </div>
           </div>
 
@@ -101,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWorldStore } from '../stores/world'
 import type { WorldResponse } from '../services/api'
@@ -117,6 +120,16 @@ const playerWorlds = worldStore.playerWorlds
 const isLoading = worldStore.isLoading
 const error = worldStore.error
 
+// Sort worlds: Easy, Medium, Hard
+const sortedWorlds = computed(() => {
+  const difficultyOrder: Record<string, number> = { 'Easy': 0, 'Medium': 1, 'Hard': 2 }
+  return [...worlds.value].sort((a, b) => {
+    const orderA = difficultyOrder[a.difficulty] ?? 99
+    const orderB = difficultyOrder[b.difficulty] ?? 99
+    return orderA - orderB
+  })
+})
+
 onMounted(async () => {
   await loadData()
 })
@@ -127,10 +140,10 @@ async function loadData() {
     worldStore.loadMyWorlds()
   ])
 
-  // Pre-select default world if no world is selected
+  // Pre-select Medium (recommended) world
   if (!selectedWorld.value && worlds.value.length > 0) {
-    const defaultWorld = worlds.value.find(w => w.isDefault) || worlds.value[0]
-    selectedWorld.value = defaultWorld
+    const mediumWorld = worlds.value.find(w => w.difficulty === 'Medium' || w.isDefault)
+    selectedWorld.value = mediumWorld || worlds.value[0]
   }
 }
 
@@ -145,7 +158,7 @@ function isWorldJoined(worldId: string): boolean {
 function getButtonText(): string {
   if (!selectedWorld.value) return 'Select a World'
   if (isWorldJoined(selectedWorld.value.id)) return 'Continue Playing'
-  return 'Join World'
+  return 'Start in This World'
 }
 
 async function handleJoinWorld() {
@@ -188,6 +201,15 @@ function formatMultiplier(value: number): string {
   if (percentage === 0) return 'Standard'
   return percentage > 0 ? `+${percentage}%` : `${percentage}%`
 }
+
+function getMultiplierClass(value: number, inverted = false): string {
+  const percentage = Math.round((value - 1) * 100)
+  if (percentage === 0) return ''
+  if (inverted) {
+    return percentage > 0 ? 'negative' : 'positive'
+  }
+  return percentage > 0 ? 'positive' : 'negative'
+}
 </script>
 
 <style scoped>
@@ -221,7 +243,22 @@ function formatMultiplier(value: number): string {
   font-size: 16px;
   color: var(--text-secondary);
   max-width: 600px;
+  margin: 0 auto 12px;
+}
+
+.subtitle strong {
+  color: var(--accent-primary);
+}
+
+.hint {
+  font-size: 14px;
+  color: var(--text-muted);
+  max-width: 500px;
   margin: 0 auto;
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
 }
 
 .loading-state,
@@ -249,9 +286,15 @@ function formatMultiplier(value: number): string {
 
 .worlds-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
   margin-bottom: 48px;
+}
+
+@media (max-width: 1024px) {
+  .worlds-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .world-card {
@@ -276,8 +319,43 @@ function formatMultiplier(value: number): string {
   background: rgba(59, 130, 246, 0.05);
 }
 
+.world-card.recommended {
+  border-color: #f59e0b;
+}
+
+.world-card.recommended.selected {
+  border-color: var(--accent-primary);
+}
+
 .world-card.joined {
   border-color: var(--color-success);
+}
+
+.recommended-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: white;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.recommended-banner svg {
+  width: 14px;
+  height: 14px;
+}
+
+.world-card.recommended {
+  padding-top: 56px;
 }
 
 .world-badge {
@@ -349,6 +427,14 @@ function formatMultiplier(value: number): string {
   color: var(--text-primary);
 }
 
+.stat-value.positive {
+  color: #22c55e;
+}
+
+.stat-value.negative {
+  color: #ef4444;
+}
+
 .world-footer {
   display: flex;
   align-items: center;
@@ -370,20 +456,6 @@ function formatMultiplier(value: number): string {
   height: 16px;
 }
 
-.default-badge {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #f59e0b;
-}
-
-.default-badge svg {
-  width: 14px;
-  height: 14px;
-}
-
 .joined-indicator {
   position: absolute;
   top: 16px;
@@ -397,6 +469,10 @@ function formatMultiplier(value: number): string {
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
+}
+
+.world-card.recommended .joined-indicator {
+  top: 48px;
 }
 
 .joined-indicator svg {

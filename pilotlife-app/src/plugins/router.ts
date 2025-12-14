@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
-import AirportSelectionView from '../views/AirportSelectionView.vue'
 import WorldSelectionView from '../views/WorldSelectionView.vue'
 import WorldAirportSelectionView from '../views/WorldAirportSelectionView.vue'
 import DashboardView from '../views/DashboardView.vue'
@@ -31,12 +30,6 @@ const routes = [
     name: 'register',
     component: RegisterView,
     meta: { requiresGuest: true },
-  },
-  {
-    path: '/select-airport',
-    name: 'select-airport',
-    component: AirportSelectionView,
-    meta: { requiresAuth: true, requiresNoHomeAirport: true },
   },
   {
     path: '/select-world',
@@ -127,12 +120,11 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   const isAuthenticated = hasValidToken && hasUserData
-  const hasHomeAirport = userStore.user.value?.homeAirportId != null
 
   // Check if any parent route requires auth
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest)
-  const requiresNoHomeAirport = to.matched.some(record => record.meta.requiresNoHomeAirport)
+  const requiresNoWorld = to.matched.some(record => record.meta.requiresNoWorld)
   const requiresNoWorldHomeAirport = to.matched.some(record => record.meta.requiresNoWorldHomeAirport)
   const requiresDeveloperMode = to.matched.some(record => record.meta.requiresDeveloperMode)
   const requiresAdminMode = to.matched.some(record => record.meta.requiresAdminMode)
@@ -152,30 +144,72 @@ router.beforeEach(async (to, _from, next) => {
   if (requiresAuth && !isAuthenticated) {
     // Redirect to login if trying to access protected route
     next('/')
-  } else if (requiresGuest && isAuthenticated) {
-    // Redirect based on whether user has home airport
-    if (hasHomeAirport) {
-      next('/dashboard')
-    } else {
-      next('/select-airport')
+    return
+  }
+
+  if (requiresGuest && isAuthenticated) {
+    // User is logged in, check their world status
+    // Load worlds data if not already loaded
+    if (worldStore.playerWorlds.value.length === 0) {
+      await worldStore.loadMyWorlds()
     }
-  } else if (requiresNoHomeAirport && hasHomeAirport) {
-    // User already has home airport, redirect to dashboard
-    next('/dashboard')
-  } else if (requiresNoWorldHomeAirport) {
-    // Check if current world has a home airport
+
+    const hasJoinedWorld = worldStore.playerWorlds.value.length > 0
     const currentWorld = worldStore.currentPlayerWorld.value
-    if (currentWorld?.homeAirportId) {
+    const hasWorldHomeAirport = currentWorld?.homeAirportId != null
+
+    if (!hasJoinedWorld) {
+      next('/select-world')
+    } else if (!hasWorldHomeAirport) {
+      next('/select-world-airport')
+    } else {
+      next('/dashboard')
+    }
+    return
+  }
+
+  // For authenticated routes, check world onboarding status
+  if (isAuthenticated) {
+    // Load worlds data if not already loaded
+    if (worldStore.playerWorlds.value.length === 0) {
+      await worldStore.loadMyWorlds()
+    }
+
+    const hasJoinedWorld = worldStore.playerWorlds.value.length > 0
+    const currentWorld = worldStore.currentPlayerWorld.value
+    const hasWorldHomeAirport = currentWorld?.homeAirportId != null
+
+    // Skip onboarding checks for onboarding routes themselves
+    const isOnboardingRoute = ['/select-world', '/select-world-airport'].includes(to.path)
+
+    if (!isOnboardingRoute) {
+      if (!hasJoinedWorld) {
+        next('/select-world')
+        return
+      } else if (!hasWorldHomeAirport) {
+        next('/select-world-airport')
+        return
+      }
+    }
+
+    // Handle requiresNoWorld - redirect if user already has a world (for initial selection only)
+    if (requiresNoWorld && hasJoinedWorld) {
+      if (!hasWorldHomeAirport) {
+        next('/select-world-airport')
+      } else {
+        next('/dashboard')
+      }
+      return
+    }
+
+    // Handle requiresNoWorldHomeAirport
+    if (requiresNoWorldHomeAirport && hasWorldHomeAirport) {
       next('/dashboard')
       return
     }
-    next()
-  } else if (isAuthenticated && !hasHomeAirport && !requiresNoHomeAirport && to.path !== '/select-airport') {
-    // User is authenticated but doesn't have home airport, redirect to selection
-    next('/select-airport')
-  } else {
-    next()
   }
+
+  next()
 })
 
 export default router

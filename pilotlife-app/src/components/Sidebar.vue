@@ -7,8 +7,15 @@
       </div>
     </div>
 
-    <div v-if="worldStore.playerWorlds.value.length > 0" class="world-selector-container">
-      <WorldSelector />
+    <div class="world-selector-container">
+      <WorldSelector v-if="worldStore.playerWorlds.value.length > 0" />
+      <router-link v-else to="/select-world" class="join-world-prompt">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 8v8M8 12h8"/>
+        </svg>
+        <span>Join a World</span>
+      </router-link>
     </div>
 
     <nav class="sidebar-nav">
@@ -148,7 +155,8 @@ const initials = computed(() => {
 })
 
 const formattedBalance = computed(() => {
-  const balance = userStore.user.value?.balance || 0
+  // Use world-specific balance from currentPlayerWorld
+  const balance = worldStore.currentPlayerWorld.value?.balance ?? userStore.user.value?.balance ?? 0
   return balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 })
 </script>
@@ -190,6 +198,34 @@ const formattedBalance = computed(() => {
 .world-selector-container {
   padding: 12px;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.join-world-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px dashed var(--accent-primary);
+  border-radius: 10px;
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.join-world-prompt:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-style: solid;
+}
+
+.join-world-prompt svg {
+  width: 20px;
+  height: 20px;
+}
+
+.join-world-prompt span {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .sidebar-nav {
