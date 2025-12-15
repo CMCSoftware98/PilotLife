@@ -103,6 +103,131 @@ interface Job {
   estimatedFlightTimeMinutes: number;
   requiredAircraftType: string;
   expiresAt: string;
+  // Enhanced fields
+  type?: 'Cargo' | 'Passenger';
+  status?: 'Available' | 'Accepted' | 'InProgress' | 'Completed' | 'Failed' | 'Cancelled' | 'Expired';
+  urgency?: 'Standard' | 'Priority' | 'Express' | 'Urgent' | 'Critical';
+  distanceCategory?: 'VeryShort' | 'Short' | 'Medium' | 'Long' | 'UltraLong';
+  passengerCount?: number;
+  passengerClass?: 'Economy' | 'Business' | 'First' | 'Charter' | 'Medical' | 'Vip';
+  riskLevel?: number;
+  title?: string;
+  description?: string;
+}
+
+// Marketplace types
+interface DealerAirport {
+  icao: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface DealerResponse {
+  id: string;
+  airportIcao: string;
+  airport?: DealerAirport;
+  dealerType: 'ManufacturerShowroom' | 'CertifiedPreOwned' | 'RegionalDealer' | 'BudgetLot' | 'SpecialtyDealer' | 'ExecutiveDealer' | 'CargoSpecialist' | 'FlightSchool';
+  name: string;
+  description?: string;
+  priceMultiplier: number;
+  offersFinancing: boolean;
+  financingDownPaymentPercent?: number;
+  financingInterestRate?: number;
+  minCondition: number;
+  maxCondition: number;
+  reputationScore: number;
+  isActive: boolean;
+}
+
+interface MarketplaceSearchParams {
+  aircraftType?: string;
+  maxDistance?: number;
+  maxPrice?: number;
+  minCondition?: number;
+  limit?: number;
+}
+
+interface MarketplaceSearchResult {
+  inventory: DealerInventoryResponse[];
+  totalCount: number;
+  searchedAirports: number;
+}
+
+interface DealerInventoryResponse {
+  id: string;
+  dealerId: string;
+  dealer?: DealerResponse;
+  aircraftId: string;
+  aircraft?: AircraftResponse;
+  registration?: string;
+  condition: number;
+  totalFlightMinutes: number;
+  totalFlightHours: number;
+  basePrice: number;
+  listPrice: number;
+  discountPercent: number;
+  isNew: boolean;
+  hasWarranty: boolean;
+  warrantyMonths?: number;
+  avionicsPackage?: string;
+  notes?: string;
+  listedAt: string;
+}
+
+interface OwnedAircraftResponse {
+  id: string;
+  worldId: string;
+  playerWorldId: string;
+  aircraftId: string;
+  aircraft?: AircraftResponse;
+  registration: string;
+  nickname?: string;
+  condition: number;
+  totalFlightMinutes: number;
+  totalFlightHours: number;
+  totalCycles: number;
+  hoursSinceLastInspection: number;
+  currentLocationIcao: string;
+  isAirworthy: boolean;
+  isInMaintenance: boolean;
+  isInUse: boolean;
+  isListedForSale: boolean;
+  hasWarranty: boolean;
+  warrantyExpiresAt?: string;
+  hasInsurance: boolean;
+  insuranceExpiresAt?: string;
+  purchasePrice: number;
+  purchasedAt: string;
+  estimatedValue: number;
+}
+
+interface PurchaseAircraftRequest {
+  inventoryId: string;
+  useFinancing?: boolean;
+  downPayment?: number;
+  loanTermMonths?: number;
+}
+
+interface PurchaseAircraftResponse {
+  success: boolean;
+  message: string;
+  ownedAircraft?: OwnedAircraftResponse;
+  newBalance: number;
+}
+
+// Cargo types
+interface CargoTypeResponse {
+  id: string;
+  category: 'GeneralCargo' | 'Perishable' | 'Hazardous' | 'LiveAnimals' | 'Oversized' | 'Medical' | 'HighValue' | 'Fragile' | 'Mail' | 'Parcels';
+  subcategory: string;
+  name: string;
+  description?: string;
+  baseRatePerLb: number;
+  requiresSpecialHandling: boolean;
+  specialHandlingType?: string;
+  isTemperatureSensitive: boolean;
+  isTimeCritical: boolean;
 }
 
 interface AcceptJobResponse extends Job {}
@@ -493,6 +618,95 @@ export const api = {
         body: JSON.stringify({ airportId }),
       }, true),
   },
+
+  marketplace: {
+    getDealers: (params?: { airportIcao?: string; dealerType?: string }): Promise<ApiResponse<DealerResponse[]>> => {
+      const searchParams = new URLSearchParams();
+      if (params?.airportIcao) searchParams.set('airportIcao', params.airportIcao);
+      if (params?.dealerType) searchParams.set('dealerType', params.dealerType);
+      const query = searchParams.toString();
+      return request<DealerResponse[]>(`/api/marketplace/dealers${query ? `?${query}` : ''}`, {}, true);
+    },
+
+    getDealer: (id: string): Promise<ApiResponse<DealerResponse>> =>
+      request<DealerResponse>(`/api/marketplace/dealers/${id}`, {}, true),
+
+    getInventory: (params?: { dealerId?: string; aircraftId?: string; minCondition?: number; maxPrice?: number }): Promise<ApiResponse<DealerInventoryResponse[]>> => {
+      const searchParams = new URLSearchParams();
+      if (params?.dealerId) searchParams.set('dealerId', params.dealerId);
+      if (params?.aircraftId) searchParams.set('aircraftId', params.aircraftId);
+      if (params?.minCondition) searchParams.set('minCondition', params.minCondition.toString());
+      if (params?.maxPrice) searchParams.set('maxPrice', params.maxPrice.toString());
+      const query = searchParams.toString();
+      return request<DealerInventoryResponse[]>(`/api/marketplace/inventory${query ? `?${query}` : ''}`, {}, true);
+    },
+
+    getInventoryItem: (id: string): Promise<ApiResponse<DealerInventoryResponse>> =>
+      request<DealerInventoryResponse>(`/api/marketplace/inventory/${id}`, {}, true),
+
+    purchase: (data: PurchaseAircraftRequest): Promise<ApiResponse<PurchaseAircraftResponse>> =>
+      request<PurchaseAircraftResponse>('/api/marketplace/purchase', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }, true),
+
+    search: (params: MarketplaceSearchParams & { fromAirportIcao: string }): Promise<ApiResponse<MarketplaceSearchResult>> => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('fromAirportIcao', params.fromAirportIcao);
+      if (params.aircraftType) searchParams.set('aircraftType', params.aircraftType);
+      if (params.maxDistance) searchParams.set('maxDistance', params.maxDistance.toString());
+      if (params.maxPrice) searchParams.set('maxPrice', params.maxPrice.toString());
+      if (params.minCondition) searchParams.set('minCondition', params.minCondition.toString());
+      if (params.limit) searchParams.set('limit', params.limit.toString());
+      return request<MarketplaceSearchResult>(`/api/marketplace/search?${searchParams}`, {}, true);
+    },
+
+    getLocalInventory: (airportIcao: string): Promise<ApiResponse<DealerInventoryResponse[]>> =>
+      request<DealerInventoryResponse[]>(`/api/marketplace/inventory/local/${airportIcao}`, {}, true),
+  },
+
+  hangar: {
+    getMyAircraft: (params?: { worldId?: string; locationIcao?: string }): Promise<ApiResponse<OwnedAircraftResponse[]>> => {
+      const searchParams = new URLSearchParams();
+      if (params?.worldId) searchParams.set('worldId', params.worldId);
+      if (params?.locationIcao) searchParams.set('locationIcao', params.locationIcao);
+      const query = searchParams.toString();
+      return request<OwnedAircraftResponse[]>(`/api/hangar/my-aircraft${query ? `?${query}` : ''}`, {}, true);
+    },
+
+    getAircraft: (id: string): Promise<ApiResponse<OwnedAircraftResponse>> =>
+      request<OwnedAircraftResponse>(`/api/hangar/${id}`, {}, true),
+
+    updateNickname: (id: string, nickname: string): Promise<ApiResponse<OwnedAircraftResponse>> =>
+      request<OwnedAircraftResponse>(`/api/hangar/${id}/nickname`, {
+        method: 'PUT',
+        body: JSON.stringify({ nickname }),
+      }, true),
+
+    listForSale: (id: string, askingPrice: number): Promise<ApiResponse<OwnedAircraftResponse>> =>
+      request<OwnedAircraftResponse>(`/api/hangar/${id}/list-for-sale`, {
+        method: 'POST',
+        body: JSON.stringify({ askingPrice }),
+      }, true),
+
+    cancelSale: (id: string): Promise<ApiResponse<OwnedAircraftResponse>> =>
+      request<OwnedAircraftResponse>(`/api/hangar/${id}/cancel-sale`, {
+        method: 'POST',
+      }, true),
+  },
+
+  cargo: {
+    getTypes: (params?: { category?: string; activeOnly?: boolean }): Promise<ApiResponse<CargoTypeResponse[]>> => {
+      const searchParams = new URLSearchParams();
+      if (params?.category) searchParams.set('category', params.category);
+      if (params?.activeOnly !== undefined) searchParams.set('activeOnly', params.activeOnly.toString());
+      const query = searchParams.toString();
+      return request<CargoTypeResponse[]>(`/api/cargo/types${query ? `?${query}` : ''}`, {}, true);
+    },
+
+    getType: (id: string): Promise<ApiResponse<CargoTypeResponse>> =>
+      request<CargoTypeResponse>(`/api/cargo/types/${id}`, {}, true),
+  },
 };
 
 // World types
@@ -548,5 +762,14 @@ export type {
   AircraftResponse,
   CreateAircraftRequestData,
   WorldResponse,
-  PlayerWorldResponse
+  PlayerWorldResponse,
+  DealerResponse,
+  DealerAirport,
+  DealerInventoryResponse,
+  OwnedAircraftResponse,
+  PurchaseAircraftRequest,
+  PurchaseAircraftResponse,
+  CargoTypeResponse,
+  MarketplaceSearchParams,
+  MarketplaceSearchResult
 };

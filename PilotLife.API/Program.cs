@@ -3,8 +3,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PilotLife.API.Services;
+using PilotLife.API.Services.Jobs;
 using PilotLife.Application.Authorization;
 using PilotLife.Application.FlightTracking;
+using PilotLife.Application.Jobs;
+using PilotLife.Application.Marketplace;
 using PilotLife.Database.Data;
 using Scalar.AspNetCore;
 
@@ -73,6 +76,18 @@ builder.Services.AddSingleton<AirportImportService>();
 builder.Services.AddScoped<IFlightTrackingService, FlightTrackingService>();
 builder.Services.AddScoped<IAuthorizationService, AuthorizationService>();
 builder.Services.AddScoped<DatabaseSeeder>();
+
+// Marketplace services
+builder.Services.Configure<MarketplaceConfiguration>(
+    builder.Configuration.GetSection(MarketplaceConfiguration.SectionName));
+builder.Services.AddScoped<IMarketplaceGenerator, MarketplaceGenerator>();
+builder.Services.AddHostedService<MarketplacePopulationService>();
+
+// Job generation services
+builder.Services.Configure<JobGenerationConfiguration>(
+    builder.Configuration.GetSection(JobGenerationConfiguration.SectionName));
+builder.Services.AddScoped<IJobGenerator, JobGenerationService>();
+builder.Services.AddHostedService<JobGenerationBackgroundService>();
 
 var app = builder.Build();
 

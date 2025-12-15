@@ -6,6 +6,7 @@ import WorldAirportSelectionView from '../views/WorldAirportSelectionView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import JobsView from '../views/JobsView.vue'
 import HangarView from '../views/HangarView.vue'
+import MarketplaceView from '../views/MarketplaceView.vue'
 import SkillsView from '../views/SkillsView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import SettingsView from '../views/SettingsView.vue'
@@ -62,6 +63,11 @@ const routes = [
         path: 'hangar',
         name: 'hangar',
         component: HangarView,
+      },
+      {
+        path: 'marketplace',
+        name: 'marketplace',
+        component: MarketplaceView,
       },
       {
         path: 'skills',

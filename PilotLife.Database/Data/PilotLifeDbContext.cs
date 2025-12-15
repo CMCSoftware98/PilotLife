@@ -42,6 +42,9 @@ public class PilotLifeDbContext : DbContext
     public DbSet<DealerInventory> DealerInventory => Set<DealerInventory>();
     public DbSet<AircraftPurchase> AircraftPurchases => Set<AircraftPurchase>();
 
+    // Cargo entities
+    public DbSet<CargoType> CargoTypes => Set<CargoType>();
+
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         UpdateTimestamps();
@@ -92,6 +95,7 @@ public class PilotLifeDbContext : DbContext
         ConfigureBaseEntity<AircraftDealer>(modelBuilder);
         ConfigureBaseEntity<DealerInventory>(modelBuilder);
         ConfigureBaseEntity<AircraftPurchase>(modelBuilder);
+        ConfigureBaseEntity<CargoType>(modelBuilder);
 
         ConfigureUser(modelBuilder);
         ConfigureAirport(modelBuilder);
@@ -115,6 +119,7 @@ public class PilotLifeDbContext : DbContext
         ConfigureAircraftDealer(modelBuilder);
         ConfigureDealerInventory(modelBuilder);
         ConfigureAircraftPurchase(modelBuilder);
+        ConfigureCargoType(modelBuilder);
     }
 
     private static void ConfigureBaseEntity<T>(ModelBuilder modelBuilder) where T : BaseEntity
@@ -276,47 +281,177 @@ public class PilotLifeDbContext : DbContext
         {
             entity.ToTable("jobs");
 
+            // World
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            // Route
             entity.Property(e => e.DepartureAirportId)
                 .HasColumnName("departure_airport_id")
                 .IsRequired();
+
+            entity.Property(e => e.DepartureIcao)
+                .HasColumnName("departure_icao")
+                .HasMaxLength(10);
 
             entity.Property(e => e.ArrivalAirportId)
                 .HasColumnName("arrival_airport_id")
                 .IsRequired();
 
+            entity.Property(e => e.ArrivalIcao)
+                .HasColumnName("arrival_icao")
+                .HasMaxLength(10);
+
+            entity.Property(e => e.DistanceNm)
+                .HasColumnName("distance_nm");
+
+            entity.Property(e => e.DistanceCategory)
+                .HasColumnName("distance_category")
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.Property(e => e.RouteDifficulty)
+                .HasColumnName("route_difficulty")
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // Job type and status
+            entity.Property(e => e.Type)
+                .HasColumnName("type")
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.Property(e => e.Urgency)
+                .HasColumnName("urgency")
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // Cargo details
+            entity.Property(e => e.CargoTypeId)
+                .HasColumnName("cargo_type_id");
+
             entity.Property(e => e.CargoType)
                 .HasColumnName("cargo_type")
-                .HasMaxLength(50)
-                .IsRequired();
+                .HasMaxLength(100);
 
-            entity.Property(e => e.Weight)
-                .HasColumnName("weight");
+            entity.Property(e => e.WeightLbs)
+                .HasColumnName("weight_lbs");
+
+            entity.Property(e => e.VolumeCuFt)
+                .HasColumnName("volume_cu_ft")
+                .HasPrecision(12, 2);
+
+            // Passenger details
+            entity.Property(e => e.PassengerCount)
+                .HasColumnName("passenger_count");
+
+            entity.Property(e => e.PassengerClass)
+                .HasColumnName("passenger_class")
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // Requirements
+            entity.Property(e => e.RequiredAircraftType)
+                .HasColumnName("required_aircraft_type")
+                .HasMaxLength(100);
+
+            entity.Property(e => e.MinCrewCount)
+                .HasColumnName("min_crew_count");
+
+            entity.Property(e => e.RequiresSpecialCertification)
+                .HasColumnName("requires_special_certification")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.RequiredCertification)
+                .HasColumnName("required_certification")
+                .HasMaxLength(100);
+
+            entity.Property(e => e.RiskLevel)
+                .HasColumnName("risk_level")
+                .HasDefaultValue(1);
+
+            // Payout
+            entity.Property(e => e.BasePayout)
+                .HasColumnName("base_payout")
+                .HasPrecision(18, 2);
 
             entity.Property(e => e.Payout)
                 .HasColumnName("payout")
                 .HasPrecision(18, 2);
 
-            entity.Property(e => e.DistanceNm)
-                .HasColumnName("distance_nm");
+            entity.Property(e => e.BonusPayout)
+                .HasColumnName("bonus_payout")
+                .HasPrecision(18, 2);
 
+            entity.Property(e => e.ActualPayout)
+                .HasColumnName("actual_payout")
+                .HasPrecision(18, 2);
+
+            // Timing
             entity.Property(e => e.EstimatedFlightTimeMinutes)
                 .HasColumnName("estimated_flight_time_minutes");
-
-            entity.Property(e => e.RequiredAircraftType)
-                .HasColumnName("required_aircraft_type")
-                .HasMaxLength(50)
-                .IsRequired();
 
             entity.Property(e => e.ExpiresAt)
                 .HasColumnName("expires_at")
                 .HasColumnType("timestamptz");
 
+            entity.Property(e => e.AcceptedAt)
+                .HasColumnName("accepted_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.StartedAt)
+                .HasColumnName("started_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamptz");
+
+            // Assignment
+            entity.Property(e => e.AssignedToUserId)
+                .HasColumnName("assigned_to_user_id");
+
+            entity.Property(e => e.AssignedToPlayerWorldId)
+                .HasColumnName("assigned_to_player_world_id");
+
+            // Completion
             entity.Property(e => e.IsCompleted)
                 .HasColumnName("is_completed")
                 .HasDefaultValue(false);
 
-            entity.Property(e => e.AssignedToUserId)
-                .HasColumnName("assigned_to_user_id");
+            entity.Property(e => e.IsFailed)
+                .HasColumnName("is_failed")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.FailureReason)
+                .HasColumnName("failure_reason")
+                .HasMaxLength(500);
+
+            // Display
+            entity.Property(e => e.Title)
+                .HasColumnName("title")
+                .HasMaxLength(200);
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(1000);
+
+            // Ignore computed properties
+            entity.Ignore(e => e.IsAvailable);
+            entity.Ignore(e => e.IsExpired);
+            entity.Ignore(e => e.TimeRemaining);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(e => e.DepartureAirport)
                 .WithMany()
@@ -328,14 +463,31 @@ public class PilotLifeDbContext : DbContext
                 .HasForeignKey(e => e.ArrivalAirportId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            entity.HasOne(e => e.CargoTypeRef)
+                .WithMany()
+                .HasForeignKey(e => e.CargoTypeId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasOne(e => e.AssignedToUser)
                 .WithMany()
                 .HasForeignKey(e => e.AssignedToUserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            entity.HasOne(e => e.AssignedToPlayerWorld)
+                .WithMany()
+                .HasForeignKey(e => e.AssignedToPlayerWorldId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
             entity.HasIndex(e => e.DepartureAirportId);
+            entity.HasIndex(e => e.ArrivalAirportId);
+            entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.IsCompleted);
             entity.HasIndex(e => e.AssignedToUserId);
+            entity.HasIndex(e => e.AssignedToPlayerWorldId);
+            entity.HasIndex(e => new { e.WorldId, e.Status });
+            entity.HasIndex(e => new { e.WorldId, e.DepartureIcao, e.Status });
         });
     }
 
@@ -2085,6 +2237,92 @@ public class PilotLifeDbContext : DbContext
             entity.HasIndex(e => e.DealerId);
             entity.HasIndex(e => e.PurchasedAt);
             entity.HasIndex(e => new { e.PlayerWorldId, e.PurchasedAt });
+        });
+    }
+
+    private static void ConfigureCargoType(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CargoType>(entity =>
+        {
+            entity.ToTable("cargo_types");
+
+            entity.Property(e => e.Category)
+                .HasColumnName("category")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.Subcategory)
+                .HasColumnName("subcategory")
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.BaseRatePerLb)
+                .HasColumnName("base_rate_per_lb")
+                .HasPrecision(10, 4);
+
+            entity.Property(e => e.MinWeightLbs)
+                .HasColumnName("min_weight_lbs")
+                .HasDefaultValue(100);
+
+            entity.Property(e => e.MaxWeightLbs)
+                .HasColumnName("max_weight_lbs")
+                .HasDefaultValue(5000);
+
+            entity.Property(e => e.DensityFactor)
+                .HasColumnName("density_factor")
+                .HasPrecision(6, 4)
+                .HasDefaultValue(0.1m);
+
+            entity.Property(e => e.RequiresSpecialHandling)
+                .HasColumnName("requires_special_handling")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.SpecialHandlingType)
+                .HasColumnName("special_handling_type")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.IsTemperatureSensitive)
+                .HasColumnName("is_temperature_sensitive")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IsTimeCritical)
+                .HasColumnName("is_time_critical")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IsIllegal)
+                .HasColumnName("is_illegal")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.IllegalRiskLevel)
+                .HasColumnName("illegal_risk_level");
+
+            entity.Property(e => e.PayoutMultiplier)
+                .HasColumnName("payout_multiplier")
+                .HasPrecision(5, 2)
+                .HasDefaultValue(1.0m);
+
+            entity.Property(e => e.IsActive)
+                .HasColumnName("is_active")
+                .HasDefaultValue(true);
+
+            // Ignore computed properties
+            entity.Ignore(e => e.EffectiveRatePerLb);
+
+            // Indexes
+            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => e.Subcategory);
+            entity.HasIndex(e => new { e.Category, e.Subcategory });
+            entity.HasIndex(e => e.IsActive);
         });
     }
 }

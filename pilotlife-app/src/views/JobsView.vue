@@ -9,7 +9,7 @@
       <div class="filters">
         <v-select
           v-model="selectedCargoType"
-          :items="cargoTypes"
+          :items="cargoTypeOptions"
           label="Cargo Type"
           variant="outlined"
           density="compact"
@@ -18,9 +18,9 @@
           class="filter-select"
         />
         <v-select
-          v-model="selectedAircraftType"
-          :items="aircraftTypes"
-          label="Aircraft Type"
+          v-model="selectedUrgency"
+          :items="urgencyOptions"
+          label="Urgency"
           variant="outlined"
           density="compact"
           clearable
@@ -49,9 +49,18 @@
           v-for="job in jobs"
           :key="job.id"
           class="job-card"
-          :class="{ selected: selectedJob?.id === job.id }"
+          :class="{ selected: selectedJob?.id === job.id, [getUrgencyClass(job.urgency)]: true }"
           @click="selectJob(job)"
         >
+          <div class="job-header">
+            <div class="job-type-badge" :class="getJobTypeClass(job.type)">
+              {{ job.type || 'Cargo' }}
+            </div>
+            <div v-if="job.urgency && job.urgency !== 'Standard'" class="urgency-badge" :class="getUrgencyBadgeClass(job.urgency)">
+              {{ job.urgency }}
+            </div>
+          </div>
+
           <div class="job-route">
             <span class="airport-code">{{ job.departureAirport.iataCode || job.departureAirport.ident }}</span>
             <div class="route-line">
@@ -65,30 +74,43 @@
           <div class="job-details">
             <div class="detail-row">
               <span class="detail-label">Distance</span>
-              <span class="detail-value">{{ Math.round(job.distanceNm) }} nm</span>
+              <span class="detail-value">
+                {{ Math.round(job.distanceNm) }} nm
+                <span v-if="job.distanceCategory" class="distance-category">({{ formatDistanceCategory(job.distanceCategory) }})</span>
+              </span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Flight Time</span>
               <span class="detail-value">{{ formatFlightTime(job.estimatedFlightTimeMinutes) }}</span>
             </div>
             <div class="detail-row">
-              <span class="detail-label">Cargo</span>
-              <span class="detail-value cargo-badge">{{ job.cargoType }}</span>
+              <span class="detail-label">{{ job.type === 'Passenger' ? 'Passengers' : 'Cargo' }}</span>
+              <span class="detail-value cargo-badge">
+                {{ job.type === 'Passenger' ? `${job.passengerCount} pax` : job.cargoType }}
+              </span>
             </div>
-            <div class="detail-row">
+            <div v-if="job.type === 'Passenger' && job.passengerClass" class="detail-row">
+              <span class="detail-label">Class</span>
+              <span class="detail-value passenger-class" :class="getPassengerClassStyle(job.passengerClass)">
+                {{ job.passengerClass }}
+              </span>
+            </div>
+            <div v-if="job.type !== 'Passenger'" class="detail-row">
               <span class="detail-label">Weight</span>
-              <span class="detail-value">{{ job.weight.toLocaleString() }} kg</span>
+              <span class="detail-value">{{ (job.weight || 0).toLocaleString() }} lbs</span>
             </div>
-            <div class="detail-row">
-              <span class="detail-label">Aircraft</span>
-              <span class="detail-value">{{ job.requiredAircraftType }}</span>
+            <div v-if="job.riskLevel && job.riskLevel > 1" class="detail-row">
+              <span class="detail-label">Risk</span>
+              <span class="detail-value risk-level" :class="getRiskClass(job.riskLevel)">
+                {{ getRiskLabel(job.riskLevel) }}
+              </span>
             </div>
           </div>
 
           <div class="job-footer">
             <div class="payout">
               <span class="payout-label">Payout</span>
-              <span class="payout-value">${{ job.payout.toLocaleString() }}</span>
+              <span class="payout-value" :class="{ 'high-payout': isHighPayout(job) }">${{ job.payout.toLocaleString() }}</span>
             </div>
             <v-btn
               size="small"
@@ -179,10 +201,27 @@ const loading = ref(true)
 const acceptingJobId = ref<string | null>(null)
 
 const selectedCargoType = ref<string | null>(null)
-const selectedAircraftType = ref<string | null>(null)
+const selectedUrgency = ref<string | null>(null)
 
-const cargoTypes = ['Passengers', 'Cargo', 'Mail', 'Medical', 'Hazmat']
-const aircraftTypes = ['Light', 'Medium', 'Heavy', 'Turboprop', 'Jet']
+const cargoTypeOptions = [
+  { title: 'General Cargo', value: 'GeneralCargo' },
+  { title: 'Perishable', value: 'Perishable' },
+  { title: 'Hazardous', value: 'Hazardous' },
+  { title: 'Live Animals', value: 'LiveAnimals' },
+  { title: 'Medical', value: 'Medical' },
+  { title: 'High Value', value: 'HighValue' },
+  { title: 'Fragile', value: 'Fragile' },
+  { title: 'Mail', value: 'Mail' },
+  { title: 'Parcels', value: 'Parcels' },
+]
+
+const urgencyOptions = [
+  { title: 'Standard', value: 'Standard' },
+  { title: 'Priority (1.2x)', value: 'Priority' },
+  { title: 'Express (1.5x)', value: 'Express' },
+  { title: 'Urgent (2x)', value: 'Urgent' },
+  { title: 'Critical (3x)', value: 'Critical' },
+]
 
 const mapRef = ref()
 const zoom = ref(4)
@@ -220,6 +259,57 @@ function formatFlightTime(minutes: number): string {
   const mins = minutes % 60
   if (hours === 0) return `${mins}m`
   return `${hours}h ${mins}m`
+}
+
+function formatDistanceCategory(category?: string): string {
+  if (!category) return ''
+  return category.replace(/([A-Z])/g, ' $1').trim()
+}
+
+function getUrgencyClass(urgency?: string): string {
+  if (!urgency || urgency === 'Standard') return ''
+  return `urgency-${urgency.toLowerCase()}`
+}
+
+function getUrgencyBadgeClass(urgency?: string): string {
+  switch (urgency) {
+    case 'Priority': return 'urgency-badge-priority'
+    case 'Express': return 'urgency-badge-express'
+    case 'Urgent': return 'urgency-badge-urgent'
+    case 'Critical': return 'urgency-badge-critical'
+    default: return ''
+  }
+}
+
+function getJobTypeClass(type?: string): string {
+  return type === 'Passenger' ? 'job-type-passenger' : 'job-type-cargo'
+}
+
+function getPassengerClassStyle(passengerClass?: string): string {
+  switch (passengerClass) {
+    case 'First':
+    case 'Vip': return 'class-premium'
+    case 'Business': return 'class-business'
+    default: return 'class-economy'
+  }
+}
+
+function getRiskClass(riskLevel?: number): string {
+  if (!riskLevel) return ''
+  if (riskLevel >= 4) return 'risk-high'
+  if (riskLevel >= 3) return 'risk-medium'
+  return 'risk-low'
+}
+
+function getRiskLabel(riskLevel?: number): string {
+  if (!riskLevel) return 'Low'
+  if (riskLevel >= 4) return 'High'
+  if (riskLevel >= 3) return 'Medium'
+  return 'Low'
+}
+
+function isHighPayout(job: Job): boolean {
+  return job.payout >= 10000 || (job.urgency !== undefined && job.urgency !== 'Standard')
 }
 
 async function loadJobs() {
@@ -268,7 +358,7 @@ async function acceptJob(job: Job) {
   acceptingJobId.value = null
 }
 
-watch([selectedCargoType, selectedAircraftType], () => {
+watch([selectedCargoType, selectedUrgency], () => {
   loadJobs()
 })
 
@@ -366,6 +456,79 @@ onMounted(() => {
   box-shadow: 0 0 0 4px var(--accent-glow);
 }
 
+.job-card.urgency-priority {
+  border-left: 3px solid #3b82f6;
+}
+
+.job-card.urgency-express {
+  border-left: 3px solid #eab308;
+}
+
+.job-card.urgency-urgent {
+  border-left: 3px solid #f97316;
+}
+
+.job-card.urgency-critical {
+  border-left: 3px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.job-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.job-type-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.job-type-cargo {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.job-type-passenger {
+  background: rgba(168, 85, 247, 0.2);
+  color: #a855f7;
+}
+
+.urgency-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.urgency-badge-priority {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.urgency-badge-express {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+.urgency-badge-urgent {
+  background: rgba(249, 115, 22, 0.2);
+  color: #f97316;
+}
+
+.urgency-badge-critical {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .job-route {
   display: flex;
   align-items: center;
@@ -446,6 +609,58 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 700;
   color: #22c55e;
+}
+
+.payout-value.high-payout {
+  color: #f59e0b;
+}
+
+.distance-category {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.passenger-class {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.class-economy {
+  background: rgba(156, 163, 175, 0.2);
+  color: #9ca3af;
+}
+
+.class-business {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.class-premium {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+.risk-level {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.risk-low {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.risk-medium {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+.risk-high {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
 }
 
 .accept-btn {

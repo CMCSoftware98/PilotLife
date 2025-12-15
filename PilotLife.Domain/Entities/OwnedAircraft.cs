@@ -95,6 +95,11 @@ public class OwnedAircraft : BaseEntity
     public bool IsListedForSale { get; set; }
 
     /// <summary>
+    /// The asking price when listed for sale.
+    /// </summary>
+    public decimal? AskingPrice { get; set; }
+
+    /// <summary>
     /// Whether the aircraft is airworthy (meets minimum condition requirements).
     /// </summary>
     public bool IsAirworthy => Condition >= 60 && !IsInMaintenance;

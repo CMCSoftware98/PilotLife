@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PilotLife.Database.Data;
@@ -11,9 +12,11 @@ using PilotLife.Database.Data;
 namespace PilotLife.Database.Migrations
 {
     [DbContext(typeof(PilotLifeDbContext))]
-    partial class PilotLifeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251214190455_AddCargoAndJobEnhancements")]
+    partial class AddCargoAndJobEnhancements
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1661,9 +1664,6 @@ namespace PilotLife.Database.Migrations
                     b.Property<Guid>("AircraftId")
                         .HasColumnType("uuid")
                         .HasColumnName("aircraft_id");
-
-                    b.Property<decimal?>("AskingPrice")
-                        .HasColumnType("numeric");
 
                     b.Property<int>("Condition")
                         .ValueGeneratedOnAdd()

@@ -29,6 +29,7 @@ public class DatabaseSeeder
         await SeedWorldsAsync();
         await SeedRolesAsync();
         await SeedAdminUserAsync();
+        await SeedCargoTypesAsync();
     }
 
     /// <summary>
@@ -327,5 +328,525 @@ public class DatabaseSeeder
         }
 
         return role;
+    }
+
+    /// <summary>
+    /// Seeds the default cargo types if they don't exist.
+    /// </summary>
+    private async Task SeedCargoTypesAsync()
+    {
+        if (await _context.CargoTypes.AnyAsync())
+        {
+            _logger.LogInformation("Cargo types already seeded, skipping.");
+            return;
+        }
+
+        _logger.LogInformation("Seeding cargo types...");
+
+        var cargoTypes = GetDefaultCargoTypes();
+
+        _context.CargoTypes.AddRange(cargoTypes);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Seeded {Count} cargo types.", cargoTypes.Count);
+    }
+
+    /// <summary>
+    /// Returns the default cargo types to seed.
+    /// </summary>
+    private static List<CargoType> GetDefaultCargoTypes()
+    {
+        var cargoTypes = new List<CargoType>();
+
+        // General Cargo
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.GeneralCargo,
+                Subcategory = "Industrial",
+                Name = "Industrial Equipment",
+                Description = "Heavy machinery and industrial equipment",
+                BaseRatePerLb = 0.45m,
+                MinWeightLbs = 500,
+                MaxWeightLbs = 25000,
+                DensityFactor = 0.08m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.GeneralCargo,
+                Subcategory = "Consumer Goods",
+                Name = "Electronics",
+                Description = "Consumer electronics and technology products",
+                BaseRatePerLb = 0.75m,
+                MinWeightLbs = 100,
+                MaxWeightLbs = 5000,
+                DensityFactor = 0.15m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.GeneralCargo,
+                Subcategory = "Consumer Goods",
+                Name = "Clothing",
+                Description = "Apparel and textile products",
+                BaseRatePerLb = 0.55m,
+                MinWeightLbs = 200,
+                MaxWeightLbs = 8000,
+                DensityFactor = 0.25m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.GeneralCargo,
+                Subcategory = "Manufacturing",
+                Name = "Auto Parts",
+                Description = "Automotive parts and components",
+                BaseRatePerLb = 0.50m,
+                MinWeightLbs = 300,
+                MaxWeightLbs = 15000,
+                DensityFactor = 0.10m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.GeneralCargo,
+                Subcategory = "Construction",
+                Name = "Building Materials",
+                Description = "Construction and building supplies",
+                BaseRatePerLb = 0.35m,
+                MinWeightLbs = 1000,
+                MaxWeightLbs = 30000,
+                DensityFactor = 0.06m
+            }
+        });
+
+        // Perishable Cargo
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.Perishable,
+                Subcategory = "Food",
+                Name = "Fresh Produce",
+                Description = "Fresh fruits and vegetables",
+                BaseRatePerLb = 0.85m,
+                MinWeightLbs = 200,
+                MaxWeightLbs = 10000,
+                DensityFactor = 0.20m,
+                IsTemperatureSensitive = true,
+                IsTimeCritical = true
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Perishable,
+                Subcategory = "Food",
+                Name = "Seafood",
+                Description = "Fresh fish and seafood",
+                BaseRatePerLb = 1.10m,
+                MinWeightLbs = 100,
+                MaxWeightLbs = 5000,
+                DensityFactor = 0.15m,
+                IsTemperatureSensitive = true,
+                IsTimeCritical = true,
+                PayoutMultiplier = 1.2m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Perishable,
+                Subcategory = "Floral",
+                Name = "Fresh Flowers",
+                Description = "Cut flowers and floral arrangements",
+                BaseRatePerLb = 1.50m,
+                MinWeightLbs = 50,
+                MaxWeightLbs = 2000,
+                DensityFactor = 0.40m,
+                IsTemperatureSensitive = true,
+                IsTimeCritical = true,
+                PayoutMultiplier = 1.3m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Perishable,
+                Subcategory = "Food",
+                Name = "Frozen Goods",
+                Description = "Frozen food products",
+                BaseRatePerLb = 0.70m,
+                MinWeightLbs = 300,
+                MaxWeightLbs = 15000,
+                DensityFactor = 0.12m,
+                IsTemperatureSensitive = true
+            }
+        });
+
+        // Medical Cargo
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.Medical,
+                Subcategory = "Pharmaceuticals",
+                Name = "Medications",
+                Description = "Prescription and OTC medications",
+                BaseRatePerLb = 2.50m,
+                MinWeightLbs = 50,
+                MaxWeightLbs = 3000,
+                DensityFactor = 0.20m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Medical",
+                IsTemperatureSensitive = true
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Medical,
+                Subcategory = "Emergency",
+                Name = "Medical Supplies",
+                Description = "Emergency medical supplies and equipment",
+                BaseRatePerLb = 3.00m,
+                MinWeightLbs = 25,
+                MaxWeightLbs = 2000,
+                DensityFactor = 0.25m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Medical",
+                IsTimeCritical = true,
+                PayoutMultiplier = 1.5m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Medical,
+                Subcategory = "Emergency",
+                Name = "Organ Transport",
+                Description = "Human organs for transplant - extremely time critical",
+                BaseRatePerLb = 50.00m,
+                MinWeightLbs = 5,
+                MaxWeightLbs = 100,
+                DensityFactor = 0.30m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Medical-Critical",
+                IsTemperatureSensitive = true,
+                IsTimeCritical = true,
+                PayoutMultiplier = 3.0m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Medical,
+                Subcategory = "Laboratory",
+                Name = "Lab Samples",
+                Description = "Medical laboratory samples",
+                BaseRatePerLb = 5.00m,
+                MinWeightLbs = 10,
+                MaxWeightLbs = 500,
+                DensityFactor = 0.30m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Medical",
+                IsTemperatureSensitive = true,
+                IsTimeCritical = true
+            }
+        });
+
+        // Hazardous Cargo
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.Hazardous,
+                Subcategory = "Chemicals",
+                Name = "Industrial Chemicals",
+                Description = "Non-flammable industrial chemicals",
+                BaseRatePerLb = 1.25m,
+                MinWeightLbs = 200,
+                MaxWeightLbs = 8000,
+                DensityFactor = 0.10m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "DG-Class8",
+                PayoutMultiplier = 1.3m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Hazardous,
+                Subcategory = "Flammable",
+                Name = "Fuel Additives",
+                Description = "Aviation and automotive fuel additives",
+                BaseRatePerLb = 1.50m,
+                MinWeightLbs = 100,
+                MaxWeightLbs = 5000,
+                DensityFactor = 0.12m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "DG-Class3",
+                PayoutMultiplier = 1.4m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Hazardous,
+                Subcategory = "Radioactive",
+                Name = "Medical Isotopes",
+                Description = "Radioactive materials for medical use",
+                BaseRatePerLb = 25.00m,
+                MinWeightLbs = 5,
+                MaxWeightLbs = 200,
+                DensityFactor = 0.50m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "DG-Class7",
+                IsTimeCritical = true,
+                PayoutMultiplier = 2.0m
+            }
+        });
+
+        // High Value Cargo
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.HighValue,
+                Subcategory = "Currency",
+                Name = "Cash Transport",
+                Description = "Bank notes and currency transfers",
+                BaseRatePerLb = 5.00m,
+                MinWeightLbs = 50,
+                MaxWeightLbs = 2000,
+                DensityFactor = 0.05m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Security"
+            },
+            new CargoType
+            {
+                Category = CargoCategory.HighValue,
+                Subcategory = "Jewelry",
+                Name = "Precious Metals",
+                Description = "Gold, silver, and precious metals",
+                BaseRatePerLb = 8.00m,
+                MinWeightLbs = 20,
+                MaxWeightLbs = 500,
+                DensityFactor = 0.02m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Security"
+            },
+            new CargoType
+            {
+                Category = CargoCategory.HighValue,
+                Subcategory = "Art",
+                Name = "Fine Art",
+                Description = "Paintings, sculptures, and artwork",
+                BaseRatePerLb = 10.00m,
+                MinWeightLbs = 25,
+                MaxWeightLbs = 1000,
+                DensityFactor = 0.50m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Fragile-Security"
+            },
+            new CargoType
+            {
+                Category = CargoCategory.HighValue,
+                Subcategory = "Technology",
+                Name = "Server Equipment",
+                Description = "High-end computing and server hardware",
+                BaseRatePerLb = 3.00m,
+                MinWeightLbs = 100,
+                MaxWeightLbs = 3000,
+                DensityFactor = 0.15m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Fragile"
+            }
+        });
+
+        // Live Animals
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.LiveAnimals,
+                Subcategory = "Pets",
+                Name = "Pet Transport",
+                Description = "Domestic pets - dogs, cats, etc.",
+                BaseRatePerLb = 1.50m,
+                MinWeightLbs = 10,
+                MaxWeightLbs = 500,
+                DensityFactor = 0.40m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "LiveAnimals",
+                IsTemperatureSensitive = true
+            },
+            new CargoType
+            {
+                Category = CargoCategory.LiveAnimals,
+                Subcategory = "Livestock",
+                Name = "Livestock Transport",
+                Description = "Cattle, sheep, and farm animals",
+                BaseRatePerLb = 0.80m,
+                MinWeightLbs = 500,
+                MaxWeightLbs = 15000,
+                DensityFactor = 0.35m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "LiveAnimals",
+                IsTemperatureSensitive = true
+            },
+            new CargoType
+            {
+                Category = CargoCategory.LiveAnimals,
+                Subcategory = "Exotic",
+                Name = "Zoo Animals",
+                Description = "Exotic animals for zoos and sanctuaries",
+                BaseRatePerLb = 3.00m,
+                MinWeightLbs = 50,
+                MaxWeightLbs = 5000,
+                DensityFactor = 0.50m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "LiveAnimals-Exotic",
+                IsTemperatureSensitive = true,
+                PayoutMultiplier = 1.5m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.LiveAnimals,
+                Subcategory = "Racing",
+                Name = "Racehorses",
+                Description = "Thoroughbred horses for racing",
+                BaseRatePerLb = 2.50m,
+                MinWeightLbs = 800,
+                MaxWeightLbs = 3000,
+                DensityFactor = 0.60m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "LiveAnimals-Equine",
+                IsTemperatureSensitive = true,
+                PayoutMultiplier = 1.8m
+            }
+        });
+
+        // Fragile Cargo
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.Fragile,
+                Subcategory = "Instruments",
+                Name = "Musical Instruments",
+                Description = "Professional musical instruments",
+                BaseRatePerLb = 2.00m,
+                MinWeightLbs = 20,
+                MaxWeightLbs = 1000,
+                DensityFactor = 0.35m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Fragile"
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Fragile,
+                Subcategory = "Antiques",
+                Name = "Antiques",
+                Description = "Antique furniture and collectibles",
+                BaseRatePerLb = 3.50m,
+                MinWeightLbs = 50,
+                MaxWeightLbs = 2000,
+                DensityFactor = 0.30m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Fragile"
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Fragile,
+                Subcategory = "Glass",
+                Name = "Glassware",
+                Description = "Scientific and specialty glassware",
+                BaseRatePerLb = 1.80m,
+                MinWeightLbs = 50,
+                MaxWeightLbs = 1500,
+                DensityFactor = 0.40m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Fragile"
+            }
+        });
+
+        // Mail and Parcels
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.Mail,
+                Subcategory = "Priority",
+                Name = "Priority Mail",
+                Description = "Priority postal service mail",
+                BaseRatePerLb = 0.65m,
+                MinWeightLbs = 100,
+                MaxWeightLbs = 5000,
+                DensityFactor = 0.20m,
+                IsTimeCritical = true
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Mail,
+                Subcategory = "Express",
+                Name = "Express Documents",
+                Description = "Time-critical documents and legal papers",
+                BaseRatePerLb = 1.20m,
+                MinWeightLbs = 20,
+                MaxWeightLbs = 500,
+                DensityFactor = 0.30m,
+                IsTimeCritical = true,
+                PayoutMultiplier = 1.3m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Parcels,
+                Subcategory = "E-commerce",
+                Name = "E-Commerce Packages",
+                Description = "Online retail shipments",
+                BaseRatePerLb = 0.70m,
+                MinWeightLbs = 200,
+                MaxWeightLbs = 10000,
+                DensityFactor = 0.22m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Parcels,
+                Subcategory = "Same-Day",
+                Name = "Same-Day Delivery",
+                Description = "Urgent same-day parcel delivery",
+                BaseRatePerLb = 1.50m,
+                MinWeightLbs = 50,
+                MaxWeightLbs = 2000,
+                DensityFactor = 0.25m,
+                IsTimeCritical = true,
+                PayoutMultiplier = 1.5m
+            }
+        });
+
+        // Oversized Cargo
+        cargoTypes.AddRange(new[]
+        {
+            new CargoType
+            {
+                Category = CargoCategory.Oversized,
+                Subcategory = "Vehicles",
+                Name = "Vehicle Transport",
+                Description = "Cars, motorcycles, and small vehicles",
+                BaseRatePerLb = 0.60m,
+                MinWeightLbs = 1000,
+                MaxWeightLbs = 10000,
+                DensityFactor = 0.08m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Oversized,
+                Subcategory = "Machinery",
+                Name = "Heavy Machinery",
+                Description = "Construction and agricultural equipment",
+                BaseRatePerLb = 0.45m,
+                MinWeightLbs = 2000,
+                MaxWeightLbs = 50000,
+                DensityFactor = 0.06m
+            },
+            new CargoType
+            {
+                Category = CargoCategory.Oversized,
+                Subcategory = "Aircraft Parts",
+                Name = "Aircraft Components",
+                Description = "Aircraft engines and large components",
+                BaseRatePerLb = 0.80m,
+                MinWeightLbs = 500,
+                MaxWeightLbs = 20000,
+                DensityFactor = 0.10m,
+                RequiresSpecialHandling = true,
+                SpecialHandlingType = "Oversized"
+            }
+        });
+
+        return cargoTypes;
     }
 }
