@@ -490,6 +490,148 @@ interface ExamCompletionResponse {
   message: string;
 }
 
+// Banking/Loan types
+interface LoanResponse {
+  id: string;
+  loanType: 'StarterLoan' | 'AircraftFinancing' | 'Personal' | 'Business' | 'Emergency';
+  status: 'Pending' | 'Active' | 'PaidOff' | 'Defaulted' | 'Rejected' | 'Cancelled';
+  principalAmount: number;
+  interestRatePerMonth: number;
+  interestRatePercent: number;
+  termMonths: number;
+  monthlyPayment: number;
+  totalRepaymentAmount: number;
+  remainingPrincipal: number;
+  totalPaid: number;
+  paymentsMade: number;
+  paymentsRemaining: number;
+  nextPaymentDue?: string;
+  approvedAt?: string;
+  paidOffAt?: string;
+  purpose?: string;
+  bankName?: string;
+  collateralAircraftRegistration?: string;
+}
+
+interface LoanDetailResponse extends LoanResponse {
+  accruedInterest: number;
+  latePaymentCount: number;
+  missedPaymentCount: number;
+  disbursedAt?: string;
+  defaultedAt?: string;
+  notes?: string;
+  collateralAircraftTitle?: string;
+  payoffAmount: number;
+  payments: PaymentResponse[];
+  createdAt: string;
+}
+
+interface LoanSummaryResponse {
+  totalLoans: number;
+  activeLoans: number;
+  paidOffLoans: number;
+  defaultedLoans: number;
+  totalDebt: number;
+  totalMonthlyPayment: number;
+  nextPaymentDue?: string;
+  hasStarterLoan: boolean;
+}
+
+interface StarterLoanEligibilityResponse {
+  isEligible: boolean;
+  reason?: string;
+  requiresCpl: boolean;
+  maxAmount?: number;
+  interestRate?: number;
+  interestRatePercent?: number;
+  availableTerms?: number[];
+  currentBalance?: number;
+  currentNetWorth?: number;
+  bankName?: string;
+}
+
+interface LoanApplicationResponse {
+  success: boolean;
+  message: string;
+  loan?: LoanResponse;
+  newBalance: number;
+}
+
+interface LoanPaymentResultResponse {
+  success: boolean;
+  message: string;
+  payment?: PaymentResponse;
+  loanPaidOff: boolean;
+  newBalance: number;
+}
+
+interface PaymentResponse {
+  id: string;
+  paymentNumber: number;
+  amount: number;
+  principalPortion: number;
+  interestPortion: number;
+  lateFee: number;
+  remainingBalanceAfter: number;
+  dueDate: string;
+  paidAt: string;
+  isLate: boolean;
+  daysLate: number;
+}
+
+interface CreditScoreResponse {
+  score: number;
+  rating: string;
+  minPossible: number;
+  maxPossible: number;
+  activeLoans: number;
+  totalDebt: number;
+  paidOffLoans: number;
+  defaultedLoans: number;
+  onTimePaymentPercent: number;
+  recentPositiveChanges: number;
+  recentNegativeChanges: number;
+  lastUpdated: string;
+}
+
+interface CreditScoreEventResponse {
+  id: string;
+  eventType: string;
+  scoreBefore: number;
+  scoreAfter: number;
+  scoreChange: number;
+  description: string;
+  occurredAt: string;
+}
+
+interface BankResponse {
+  id: string;
+  name: string;
+  description?: string;
+  offersStarterLoan: boolean;
+  starterLoanMaxAmount: number;
+  starterLoanInterestRatePercent: number;
+  baseInterestRatePercent: number;
+  maxInterestRatePercent: number;
+  minCreditScore: number;
+  maxLoanToNetWorthRatio: number;
+  minDownPaymentPercent: number;
+  maxTermMonths: number;
+}
+
+interface StarterLoanApplicationRequest {
+  amount: number;
+  termMonths: number;
+}
+
+interface LoanApplicationRequest {
+  loanType: string;
+  amount: number;
+  termMonths: number;
+  purpose?: string;
+  collateralAircraftId?: string;
+}
+
 interface CreateAircraftRequestData {
   aircraftTitle: string;
   atcType?: string;
@@ -1128,6 +1270,54 @@ export const api = {
     getActive: (worldId: string): Promise<ApiResponse<LicenseExamResponse>> =>
       request<LicenseExamResponse>(`/api/exams/active/${worldId}`, {}, true),
   },
+
+  loans: {
+    getMyLoans: (): Promise<ApiResponse<LoanResponse[]>> =>
+      request<LoanResponse[]>('/api/loans', {}, true),
+
+    getLoan: (id: string): Promise<ApiResponse<LoanDetailResponse>> =>
+      request<LoanDetailResponse>(`/api/loans/${id}`, {}, true),
+
+    getSummary: (): Promise<ApiResponse<LoanSummaryResponse>> =>
+      request<LoanSummaryResponse>('/api/loans/summary', {}, true),
+
+    getStarterLoanEligibility: (): Promise<ApiResponse<StarterLoanEligibilityResponse>> =>
+      request<StarterLoanEligibilityResponse>('/api/loans/starter-loan/eligibility', {}, true),
+
+    applyForStarterLoan: (data: StarterLoanApplicationRequest): Promise<ApiResponse<LoanApplicationResponse>> =>
+      request<LoanApplicationResponse>('/api/loans/starter-loan/apply', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }, true),
+
+    applyForLoan: (data: LoanApplicationRequest): Promise<ApiResponse<LoanApplicationResponse>> =>
+      request<LoanApplicationResponse>('/api/loans/apply', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }, true),
+
+    makePayment: (loanId: string, amount: number): Promise<ApiResponse<LoanPaymentResultResponse>> =>
+      request<LoanPaymentResultResponse>(`/api/loans/${loanId}/pay`, {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }, true),
+
+    payOffLoan: (loanId: string): Promise<ApiResponse<LoanPaymentResultResponse>> =>
+      request<LoanPaymentResultResponse>(`/api/loans/${loanId}/payoff`, {
+        method: 'POST',
+      }, true),
+
+    getCreditScore: (): Promise<ApiResponse<CreditScoreResponse>> =>
+      request<CreditScoreResponse>('/api/loans/credit-score', {}, true),
+
+    getCreditHistory: (limit?: number): Promise<ApiResponse<CreditScoreEventResponse[]>> => {
+      const params = limit ? `?limit=${limit}` : '';
+      return request<CreditScoreEventResponse[]>(`/api/loans/credit-score/history${params}`, {}, true);
+    },
+
+    getBanks: (): Promise<ApiResponse<BankResponse[]>> =>
+      request<BankResponse[]>('/api/loans/banks', {}, true),
+  },
 };
 
 // World types
@@ -1212,5 +1402,17 @@ export type {
   ScheduleExamRequest,
   RecordViolationRequest,
   RecordLandingRequest,
-  ExamCompletionResponse
+  ExamCompletionResponse,
+  LoanResponse,
+  LoanDetailResponse,
+  LoanSummaryResponse,
+  StarterLoanEligibilityResponse,
+  LoanApplicationResponse,
+  LoanPaymentResultResponse,
+  PaymentResponse,
+  CreditScoreResponse,
+  CreditScoreEventResponse,
+  BankResponse,
+  StarterLoanApplicationRequest,
+  LoanApplicationRequest
 };

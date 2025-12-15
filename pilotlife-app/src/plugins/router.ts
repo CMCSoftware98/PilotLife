@@ -8,6 +8,7 @@ import JobsView from '../views/JobsView.vue'
 import HangarView from '../views/HangarView.vue'
 import MarketplaceView from '../views/MarketplaceView.vue'
 import LicensesView from '../views/LicensesView.vue'
+import BankingView from '../views/BankingView.vue'
 import SkillsView from '../views/SkillsView.vue'
 import ReputationView from '../views/ReputationView.vue'
 import ProfileView from '../views/ProfileView.vue'
@@ -75,6 +76,11 @@ const routes = [
         path: 'licenses',
         name: 'licenses',
         component: LicensesView,
+      },
+      {
+        path: 'banking',
+        name: 'banking',
+        component: BankingView,
       },
       {
         path: 'skills',

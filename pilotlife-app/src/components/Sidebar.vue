@@ -73,6 +73,22 @@
         <span class="nav-label">Licenses</span>
       </router-link>
 
+      <router-link to="/banking" class="nav-item" :class="{ active: isActive('/banking') }">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 21h18"/>
+            <path d="M3 10h18"/>
+            <path d="M5 6l7-3 7 3"/>
+            <path d="M4 10v11"/>
+            <path d="M20 10v11"/>
+            <path d="M8 14v3"/>
+            <path d="M12 14v3"/>
+            <path d="M16 14v3"/>
+          </svg>
+        </div>
+        <span class="nav-label">Banking</span>
+      </router-link>
+
       <router-link to="/skills" class="nav-item" :class="{ active: isActive('/skills') }">
         <div class="nav-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
