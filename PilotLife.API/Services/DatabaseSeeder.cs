@@ -30,6 +30,7 @@ public class DatabaseSeeder
         await SeedRolesAsync();
         await SeedAdminUserAsync();
         await SeedCargoTypesAsync();
+        await SeedLicenseTypesAsync();
     }
 
     /// <summary>
@@ -848,5 +849,260 @@ public class DatabaseSeeder
         });
 
         return cargoTypes;
+    }
+
+    /// <summary>
+    /// Seeds the default license types if they don't exist.
+    /// </summary>
+    private async Task SeedLicenseTypesAsync()
+    {
+        if (await _context.LicenseTypes.AnyAsync())
+        {
+            _logger.LogInformation("License types already seeded, skipping.");
+            return;
+        }
+
+        _logger.LogInformation("Seeding license types...");
+
+        var licenseTypes = GetDefaultLicenseTypes();
+
+        _context.LicenseTypes.AddRange(licenseTypes);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Seeded {Count} license types.", licenseTypes.Count);
+    }
+
+    /// <summary>
+    /// Returns the default license types to seed.
+    /// </summary>
+    private static List<LicenseType> GetDefaultLicenseTypes()
+    {
+        var licenseTypes = new List<LicenseType>();
+
+        // Core Licenses
+        licenseTypes.AddRange(new[]
+        {
+            // Discovery Flight - Entry point license (permanent)
+            new LicenseType
+            {
+                Code = "DISCOVERY",
+                Name = "Discovery Flight",
+                Description = "Basic flight certification proving fundamental aircraft control skills. Required before advancing to higher licenses.",
+                Category = LicenseCategory.Core,
+                BaseExamCost = 500m,
+                ExamDurationMinutes = 10,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.SEP,
+                ValidityGameDays = null, // Permanent
+                BaseRenewalCost = null,
+                PrerequisiteLicensesJson = null,
+                DisplayOrder = 1,
+                IsActive = true
+            },
+
+            // PPL - Private Pilot License
+            new LicenseType
+            {
+                Code = "PPL",
+                Name = "Private Pilot License",
+                Description = "Authorizes private flight operations. Unlocks access to CPL, Night Rating, Instrument Rating, and Multi-Engine Rating exams.",
+                Category = LicenseCategory.Core,
+                BaseExamCost = 2000m,
+                ExamDurationMinutes = 25,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.SEP,
+                ValidityGameDays = 180, // 6 game months
+                BaseRenewalCost = 500m,
+                PrerequisiteLicensesJson = "[\"DISCOVERY\"]",
+                DisplayOrder = 2,
+                IsActive = true
+            },
+
+            // CPL - Commercial Pilot License
+            new LicenseType
+            {
+                Code = "CPL",
+                Name = "Commercial Pilot License",
+                Description = "Authorizes commercial flight operations for hire. Required for most paying jobs and to pursue type ratings.",
+                Category = LicenseCategory.Core,
+                BaseExamCost = 5000m,
+                ExamDurationMinutes = 30,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.SEP,
+                ValidityGameDays = 90, // 3 game months
+                BaseRenewalCost = 1500m,
+                PrerequisiteLicensesJson = "[\"PPL\"]",
+                DisplayOrder = 3,
+                IsActive = true
+            },
+
+            // ATPL - Airline Transport Pilot License
+            new LicenseType
+            {
+                Code = "ATPL",
+                Name = "Airline Transport Pilot License",
+                Description = "The highest pilot certification. Required for airline operations and command of large transport aircraft.",
+                Category = LicenseCategory.Core,
+                BaseExamCost = 10000m,
+                ExamDurationMinutes = 90,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.MEP,
+                ValidityGameDays = 90, // 3 game months
+                BaseRenewalCost = 3000m,
+                PrerequisiteLicensesJson = "[\"CPL\", \"IR\", \"MEP\"]",
+                DisplayOrder = 4,
+                IsActive = true
+            }
+        });
+
+        // Endorsements
+        licenseTypes.AddRange(new[]
+        {
+            // Night Rating
+            new LicenseType
+            {
+                Code = "NIGHT",
+                Name = "Night Rating",
+                Description = "Authorizes flight operations during night hours. Unlocks night jobs with premium pay.",
+                Category = LicenseCategory.Endorsement,
+                BaseExamCost = 3000m,
+                ExamDurationMinutes = 30,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.SEP,
+                ValidityGameDays = 180, // 6 game months
+                BaseRenewalCost = 1000m,
+                PrerequisiteLicensesJson = "[\"PPL\"]",
+                DisplayOrder = 10,
+                IsActive = true
+            },
+
+            // Instrument Rating
+            new LicenseType
+            {
+                Code = "IR",
+                Name = "Instrument Rating",
+                Description = "Authorizes IFR (Instrument Flight Rules) operations. Required for most professional flying and ATPL.",
+                Category = LicenseCategory.Endorsement,
+                BaseExamCost = 5000m,
+                ExamDurationMinutes = 45,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.SEP,
+                ValidityGameDays = 90, // 3 game months
+                BaseRenewalCost = 1500m,
+                PrerequisiteLicensesJson = "[\"PPL\"]",
+                DisplayOrder = 11,
+                IsActive = true
+            },
+
+            // Multi-Engine Piston Rating
+            new LicenseType
+            {
+                Code = "MEP",
+                Name = "Multi-Engine Rating",
+                Description = "Authorizes operation of multi-engine piston aircraft. Required for twin-engine aircraft and ATPL.",
+                Category = LicenseCategory.Endorsement,
+                BaseExamCost = 4000m,
+                ExamDurationMinutes = 45,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.MEP,
+                ValidityGameDays = 180, // 6 game months
+                BaseRenewalCost = 1200m,
+                PrerequisiteLicensesJson = "[\"PPL\"]",
+                DisplayOrder = 12,
+                IsActive = true
+            },
+
+            // Dangerous Goods
+            new LicenseType
+            {
+                Code = "DG",
+                Name = "Dangerous Goods Certification",
+                Description = "Authorizes transport of hazardous materials. Required for high-paying hazmat cargo jobs.",
+                Category = LicenseCategory.Certification,
+                BaseExamCost = 2000m,
+                ExamDurationMinutes = 30,
+                PassingScore = 70,
+                RequiredAircraftCategory = null, // Any aircraft
+                ValidityGameDays = 180, // 6 game months
+                BaseRenewalCost = 600m,
+                PrerequisiteLicensesJson = "[\"CPL\"]",
+                DisplayOrder = 20,
+                IsActive = true
+            }
+        });
+
+        // Type Ratings - Basic examples (more can be added dynamically)
+        licenseTypes.AddRange(new[]
+        {
+            new LicenseType
+            {
+                Code = "TYPE-TURBOPROP",
+                Name = "Turboprop Type Rating",
+                Description = "Authorizes operation of turboprop aircraft. Required for aircraft like the King Air, TBM, and Pilatus PC-12.",
+                Category = LicenseCategory.TypeRating,
+                BaseExamCost = 5000m,
+                ExamDurationMinutes = 45,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.Turboprop,
+                ValidityGameDays = 90, // 3 game months
+                BaseRenewalCost = 1250m, // 25% of exam cost
+                PrerequisiteLicensesJson = "[\"CPL\"]",
+                DisplayOrder = 30,
+                IsActive = true
+            },
+
+            new LicenseType
+            {
+                Code = "TYPE-RJ",
+                Name = "Regional Jet Type Rating",
+                Description = "Authorizes operation of regional jet aircraft. Required for aircraft like the CRJ and ERJ series.",
+                Category = LicenseCategory.TypeRating,
+                BaseExamCost = 10000m,
+                ExamDurationMinutes = 60,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.RegionalJet,
+                ValidityGameDays = 90, // 3 game months
+                BaseRenewalCost = 2500m, // 25% of exam cost
+                PrerequisiteLicensesJson = "[\"CPL\", \"IR\"]",
+                DisplayOrder = 31,
+                IsActive = true
+            },
+
+            new LicenseType
+            {
+                Code = "TYPE-NARROWBODY",
+                Name = "Narrowbody Type Rating",
+                Description = "Authorizes operation of narrowbody airliners. Required for aircraft like the A320 and B737 families.",
+                Category = LicenseCategory.TypeRating,
+                BaseExamCost = 15000m,
+                ExamDurationMinutes = 75,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.NarrowBody,
+                ValidityGameDays = 90, // 3 game months
+                BaseRenewalCost = 3750m, // 25% of exam cost
+                PrerequisiteLicensesJson = "[\"ATPL\"]",
+                DisplayOrder = 32,
+                IsActive = true
+            },
+
+            new LicenseType
+            {
+                Code = "TYPE-WIDEBODY",
+                Name = "Widebody Type Rating",
+                Description = "Authorizes operation of widebody airliners. Required for aircraft like the A350, B777, and B787.",
+                Category = LicenseCategory.TypeRating,
+                BaseExamCost = 20000m,
+                ExamDurationMinutes = 90,
+                PassingScore = 70,
+                RequiredAircraftCategory = AircraftCategory.WideBody,
+                ValidityGameDays = 90, // 3 game months
+                BaseRenewalCost = 5000m, // 25% of exam cost
+                PrerequisiteLicensesJson = "[\"ATPL\"]",
+                DisplayOrder = 33,
+                IsActive = true
+            }
+        });
+
+        return licenseTypes;
     }
 }

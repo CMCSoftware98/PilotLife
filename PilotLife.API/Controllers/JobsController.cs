@@ -40,6 +40,29 @@ public class JobsController : ControllerBase
                 j.AssignedToUserId == null &&
                 j.ExpiresAt > DateTimeOffset.UtcNow);
 
+        // Vicinity-based search - find jobs departing from airports within range of center point
+        if (request.CenterLatitude.HasValue && request.CenterLongitude.HasValue && request.VicinityRadiusNm.HasValue)
+        {
+            var centerLat = request.CenterLatitude.Value;
+            var centerLon = request.CenterLongitude.Value;
+            var radiusNm = request.VicinityRadiusNm.Value;
+
+            // Get airports within range first (using bounding box for efficiency, then filter by actual distance)
+            var latDegreeRange = radiusNm / 60.0; // 1 degree lat ≈ 60nm
+            var lonDegreeRange = radiusNm / (60.0 * Math.Cos(centerLat * Math.PI / 180)); // Adjust for latitude
+
+            var nearbyAirportIds = await _context.Airports
+                .Where(a =>
+                    a.Latitude >= centerLat - latDegreeRange &&
+                    a.Latitude <= centerLat + latDegreeRange &&
+                    a.Longitude >= centerLon - lonDegreeRange &&
+                    a.Longitude <= centerLon + lonDegreeRange)
+                .Select(a => a.Id)
+                .ToListAsync();
+
+            query = query.Where(j => nearbyAirportIds.Contains(j.DepartureAirportId));
+        }
+
         // Filter by departure airport
         if (request.DepartureAirportId.HasValue)
         {
@@ -584,6 +607,10 @@ public record JobSearchRequest
     public bool SortDescending { get; init; } = true;
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 25;
+    // Vicinity search - search for jobs departing from airports within range of a point
+    public double? CenterLatitude { get; init; }
+    public double? CenterLongitude { get; init; }
+    public double? VicinityRadiusNm { get; init; }
 }
 
 public record JobSearchResult

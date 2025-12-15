@@ -94,15 +94,20 @@ interface JobAirport {
 
 interface Job {
   id: string;
+  worldId: string;
   departureAirport: JobAirport;
   arrivalAirport: JobAirport;
   cargoType: string;
   weight: number;
+  weightLbs?: number;
+  volumeCuFt?: number;
+  basePayout?: number;
   payout: number;
   distanceNm: number;
   estimatedFlightTimeMinutes: number;
   requiredAircraftType: string;
   expiresAt: string;
+  acceptedAt?: string;
   // Enhanced fields
   type?: 'Cargo' | 'Passenger';
   status?: 'Available' | 'Accepted' | 'InProgress' | 'Completed' | 'Failed' | 'Cancelled' | 'Expired';
@@ -111,8 +116,56 @@ interface Job {
   passengerCount?: number;
   passengerClass?: 'Economy' | 'Business' | 'First' | 'Charter' | 'Medical' | 'Vip';
   riskLevel?: number;
+  requiresSpecialCertification?: boolean;
+  requiredCertification?: string;
   title?: string;
   description?: string;
+}
+
+interface JobSearchParams {
+  worldId: string;
+  departureAirportId?: number;
+  departureIcao?: string;
+  arrivalAirportId?: number;
+  arrivalIcao?: string;
+  jobType?: 'Cargo' | 'Passenger';
+  urgency?: 'Standard' | 'Priority' | 'Express' | 'Urgent' | 'Critical';
+  cargoType?: string;
+  passengerClass?: 'Economy' | 'Business' | 'First' | 'Charter' | 'Medical' | 'Vip';
+  minDistanceNm?: number;
+  maxDistanceNm?: number;
+  distanceCategory?: 'VeryShort' | 'Short' | 'Medium' | 'Long' | 'UltraLong';
+  minPayout?: number;
+  maxPayout?: number;
+  minWeightLbs?: number;
+  maxWeightLbs?: number;
+  minPassengers?: number;
+  maxPassengers?: number;
+  requiresSpecialCertification?: boolean;
+  sortBy?: 'payout' | 'distance' | 'weight' | 'expiry' | 'urgency';
+  sortDescending?: boolean;
+  page?: number;
+  pageSize?: number;
+  // Vicinity search
+  centerLatitude?: number;
+  centerLongitude?: number;
+  vicinityRadiusNm?: number;
+}
+
+interface JobSearchResult {
+  jobs: Job[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+interface JobStatsResult {
+  availableJobs: number;
+  averagePayout: number;
+  byType: Record<string, number>;
+  byUrgency: Record<string, number>;
+  byDistanceCategory: Record<string, number>;
 }
 
 // Marketplace types
@@ -237,6 +290,204 @@ interface CompleteJobResponse {
   payout: number;
   newBalance: number;
   newLocation: string;
+}
+
+// Skills types
+interface PlayerSkillResponse {
+  skillId: string;
+  skillType: string;
+  skillName: string;
+  description: string;
+  currentXp: number;
+  level: number;
+  levelName: string;
+  xpForNextLevel: number;
+  xpForCurrentLevel: number;
+  progressToNextLevel: number;
+  isMaxLevel: boolean;
+}
+
+interface SkillXpEventResponse {
+  id: string;
+  skillType: string;
+  xpGained: number;
+  resultingXp: number;
+  resultingLevel: number;
+  causedLevelUp: boolean;
+  source: string;
+  description: string;
+  occurredAt: string;
+  relatedFlightId?: string;
+  relatedJobId?: string;
+}
+
+// Reputation types
+interface ReputationStatusResponse {
+  playerWorldId: string;
+  score: number;
+  level: number;
+  levelName: string;
+  progressToNextLevel: number;
+  onTimeDeliveries: number;
+  lateDeliveries: number;
+  failedDeliveries: number;
+  jobCompletionRate: number;
+  onTimeRate: number;
+  payoutBonus: number;
+  benefits: ReputationBenefitResponse[];
+}
+
+interface ReputationBenefitResponse {
+  name: string;
+  description: string;
+  isUnlocked: boolean;
+  requiredLevel: number;
+}
+
+interface ReputationEventResponse {
+  id: string;
+  eventType: string;
+  pointChange: number;
+  resultingScore: number;
+  description: string;
+  occurredAt: string;
+  relatedJobId?: string;
+  relatedFlightId?: string;
+}
+
+// License types
+interface LicenseTypeResponse {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  category: 'Core' | 'Endorsement' | 'TypeRating' | 'Certification';
+  aircraftCategory?: 'SEP' | 'MEP' | 'Turboprop' | 'RegionalJet' | 'NarrowBody' | 'WideBody' | 'Helicopter';
+  baseExamCost: number;
+  renewalCost: number;
+  examDurationMinutes: number;
+  passingScore: number;
+  validityGameDays: number;
+  prerequisiteLicenses: string[];
+  isActive: boolean;
+  sortOrder: number;
+}
+
+interface UserLicenseResponse {
+  id: string;
+  playerWorldId: string;
+  licenseTypeId: string;
+  licenseType?: LicenseTypeResponse;
+  earnedAt: string;
+  expiresAt?: string;
+  isValid: boolean;
+  isExpired: boolean;
+  isRevoked: boolean;
+  examScore: number;
+  examAttempts: number;
+  renewalCount: number;
+  lastRenewedAt?: string;
+  daysUntilExpiry?: number;
+}
+
+interface LicenseShopResponse {
+  licenseTypes: LicenseShopItemResponse[];
+  worldCostMultiplier: number;
+}
+
+interface LicenseShopItemResponse {
+  licenseType: LicenseTypeResponse;
+  adjustedExamCost: number;
+  adjustedRenewalCost: number;
+  isOwned: boolean;
+  isValid: boolean;
+  canPurchase: boolean;
+  missingPrerequisites: string[];
+  userLicense?: UserLicenseResponse;
+}
+
+interface LicenseCheckResponse {
+  hasLicense: boolean;
+  isValid: boolean;
+  license?: UserLicenseResponse;
+}
+
+interface LicenseExamResponse {
+  id: string;
+  playerWorldId: string;
+  licenseTypeId: string;
+  licenseType?: LicenseTypeResponse;
+  status: 'Scheduled' | 'InProgress' | 'Passed' | 'Failed' | 'Abandoned' | 'Expired';
+  scheduledAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  departureAirportIcao: string;
+  arrivalAirportIcao?: string;
+  routeWaypointsJson?: string;
+  examCost: number;
+  currentScore: number;
+  finalScore?: number;
+  passed: boolean;
+  failureReason?: string;
+  attemptNumber: number;
+  violations: ExamViolationResponse[];
+  landings: ExamLandingResponse[];
+}
+
+interface ExamViolationResponse {
+  id: string;
+  violationType: string;
+  severity: 'Minor' | 'Major' | 'Critical';
+  pointDeduction: number;
+  description?: string;
+  occurredAt: string;
+  altitude?: number;
+  airspeed?: number;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface ExamLandingResponse {
+  id: string;
+  landingType: 'TouchAndGo' | 'FullStop';
+  airportIcao: string;
+  landingRateFpm: number;
+  pointsAwarded: number;
+  isSuccessful: boolean;
+  notes?: string;
+  occurredAt: string;
+}
+
+interface ScheduleExamRequest {
+  playerWorldId: string;
+  licenseTypeCode: string;
+  departureAirportIcao: string;
+  arrivalAirportIcao?: string;
+}
+
+interface RecordViolationRequest {
+  violationType: string;
+  severity: 'Minor' | 'Major' | 'Critical';
+  pointDeduction: number;
+  description?: string;
+  altitude?: number;
+  airspeed?: number;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface RecordLandingRequest {
+  landingType: 'TouchAndGo' | 'FullStop';
+  airportIcao: string;
+  landingRateFpm: number;
+}
+
+interface ExamCompletionResponse {
+  exam: LicenseExamResponse;
+  passed: boolean;
+  finalScore: number;
+  license?: UserLicenseResponse;
+  message: string;
 }
 
 interface CreateAircraftRequestData {
@@ -506,15 +757,66 @@ export const api = {
 
     getByIdent: (ident: string): Promise<ApiResponse<Airport>> =>
       request<Airport>(`/api/airports/by-ident/${ident}`, {}, true),
+
+    getInBounds: (params: { north: number; south: number; east: number; west: number; zoomLevel?: number; limit?: number }): Promise<ApiResponse<Airport[]>> => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('north', params.north.toString());
+      searchParams.set('south', params.south.toString());
+      searchParams.set('east', params.east.toString());
+      searchParams.set('west', params.west.toString());
+      if (params.zoomLevel) searchParams.set('zoomLevel', params.zoomLevel.toString());
+      if (params.limit) searchParams.set('limit', params.limit.toString());
+      return request<Airport[]>(`/api/airports/in-bounds?${searchParams}`, {}, true);
+    },
+
+    getNearby: (params: { latitude: number; longitude: number; radiusNm?: number; types?: string; limit?: number }): Promise<ApiResponse<Airport[]>> => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('latitude', params.latitude.toString());
+      searchParams.set('longitude', params.longitude.toString());
+      if (params.radiusNm) searchParams.set('radiusNm', params.radiusNm.toString());
+      if (params.types) searchParams.set('types', params.types);
+      if (params.limit) searchParams.set('limit', params.limit.toString());
+      return request<Airport[]>(`/api/airports/nearby?${searchParams}`, {}, true);
+    },
   },
 
   jobs: {
-    getAvailable: (params: { airportId: number; cargoType?: string; aircraftType?: string; maxDistance?: number }): Promise<ApiResponse<Job[]>> => {
+    search: (params: JobSearchParams): Promise<ApiResponse<JobSearchResult>> => {
       const searchParams = new URLSearchParams();
-      searchParams.set('airportId', params.airportId.toString());
+      searchParams.set('worldId', params.worldId);
+      if (params.departureAirportId) searchParams.set('departureAirportId', params.departureAirportId.toString());
+      if (params.departureIcao) searchParams.set('departureIcao', params.departureIcao);
+      if (params.arrivalAirportId) searchParams.set('arrivalAirportId', params.arrivalAirportId.toString());
+      if (params.arrivalIcao) searchParams.set('arrivalIcao', params.arrivalIcao);
+      if (params.jobType) searchParams.set('jobType', params.jobType);
+      if (params.urgency) searchParams.set('urgency', params.urgency);
       if (params.cargoType) searchParams.set('cargoType', params.cargoType);
-      if (params.aircraftType) searchParams.set('aircraftType', params.aircraftType);
-      if (params.maxDistance) searchParams.set('maxDistance', params.maxDistance.toString());
+      if (params.passengerClass) searchParams.set('passengerClass', params.passengerClass);
+      if (params.minDistanceNm) searchParams.set('minDistanceNm', params.minDistanceNm.toString());
+      if (params.maxDistanceNm) searchParams.set('maxDistanceNm', params.maxDistanceNm.toString());
+      if (params.distanceCategory) searchParams.set('distanceCategory', params.distanceCategory);
+      if (params.minPayout) searchParams.set('minPayout', params.minPayout.toString());
+      if (params.maxPayout) searchParams.set('maxPayout', params.maxPayout.toString());
+      if (params.minWeightLbs) searchParams.set('minWeightLbs', params.minWeightLbs.toString());
+      if (params.maxWeightLbs) searchParams.set('maxWeightLbs', params.maxWeightLbs.toString());
+      if (params.minPassengers) searchParams.set('minPassengers', params.minPassengers.toString());
+      if (params.maxPassengers) searchParams.set('maxPassengers', params.maxPassengers.toString());
+      if (params.requiresSpecialCertification !== undefined) searchParams.set('requiresSpecialCertification', params.requiresSpecialCertification.toString());
+      if (params.sortBy) searchParams.set('sortBy', params.sortBy);
+      if (params.sortDescending !== undefined) searchParams.set('sortDescending', params.sortDescending.toString());
+      if (params.page) searchParams.set('page', params.page.toString());
+      if (params.pageSize) searchParams.set('pageSize', params.pageSize.toString());
+      if (params.centerLatitude) searchParams.set('centerLatitude', params.centerLatitude.toString());
+      if (params.centerLongitude) searchParams.set('centerLongitude', params.centerLongitude.toString());
+      if (params.vicinityRadiusNm) searchParams.set('vicinityRadiusNm', params.vicinityRadiusNm.toString());
+      return request<JobSearchResult>(`/api/jobs/search?${searchParams}`, {}, true);
+    },
+
+    getAvailable: (params: { worldId: string; airportId: number; limit?: number }): Promise<ApiResponse<Job[]>> => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('worldId', params.worldId);
+      searchParams.set('airportId', params.airportId.toString());
+      if (params.limit) searchParams.set('limit', params.limit.toString());
       return request<Job[]>(`/api/jobs/available?${searchParams}`, {}, true);
     },
 
@@ -532,6 +834,30 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ userId }),
       }, true),
+
+    cancel: (jobId: string, userId: string): Promise<ApiResponse<{ message: string }>> =>
+      request<{ message: string }>(`/api/jobs/${jobId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      }, true),
+
+    getMyJobs: (params: { worldId: string; userId: string; includeCompleted?: boolean }): Promise<ApiResponse<Job[]>> => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('worldId', params.worldId);
+      searchParams.set('userId', params.userId);
+      if (params.includeCompleted) searchParams.set('includeCompleted', 'true');
+      return request<Job[]>(`/api/jobs/my-jobs?${searchParams}`, {}, true);
+    },
+
+    getStats: (worldId: string, airportId?: number): Promise<ApiResponse<JobStatsResult>> => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('worldId', worldId);
+      if (airportId) searchParams.set('airportId', airportId.toString());
+      return request<JobStatsResult>(`/api/jobs/stats?${searchParams}`, {}, true);
+    },
+
+    getCargoTypes: (): Promise<ApiResponse<CargoTypeResponse[]>> =>
+      request<CargoTypeResponse[]>('/api/jobs/cargo-types', {}, true),
   },
 
   aircraftRequests: {
@@ -707,6 +1033,101 @@ export const api = {
     getType: (id: string): Promise<ApiResponse<CargoTypeResponse>> =>
       request<CargoTypeResponse>(`/api/cargo/types/${id}`, {}, true),
   },
+
+  skills: {
+    getAll: (worldId: string): Promise<ApiResponse<PlayerSkillResponse[]>> =>
+      request<PlayerSkillResponse[]>(`/api/skills/${worldId}`, {}, true),
+
+    get: (worldId: string, skillType: string): Promise<ApiResponse<PlayerSkillResponse>> =>
+      request<PlayerSkillResponse>(`/api/skills/${worldId}/${skillType}`, {}, true),
+
+    getHistory: (worldId: string, params?: { skillType?: string; limit?: number }): Promise<ApiResponse<SkillXpEventResponse[]>> => {
+      const searchParams = new URLSearchParams();
+      if (params?.skillType) searchParams.set('skillType', params.skillType);
+      if (params?.limit) searchParams.set('limit', params.limit.toString());
+      const query = searchParams.toString();
+      return request<SkillXpEventResponse[]>(`/api/skills/${worldId}/history${query ? `?${query}` : ''}`, {}, true);
+    },
+
+    getTotal: (worldId: string): Promise<ApiResponse<{ totalLevel: number }>> =>
+      request<{ totalLevel: number }>(`/api/skills/${worldId}/total`, {}, true),
+  },
+
+  reputation: {
+    getStatus: (worldId: string): Promise<ApiResponse<ReputationStatusResponse>> =>
+      request<ReputationStatusResponse>(`/api/reputation/${worldId}`, {}, true),
+
+    getHistory: (worldId: string, limit?: number): Promise<ApiResponse<ReputationEventResponse[]>> => {
+      const params = limit ? `?limit=${limit}` : '';
+      return request<ReputationEventResponse[]>(`/api/reputation/${worldId}/history${params}`, {}, true);
+    },
+
+    getBonus: (worldId: string): Promise<ApiResponse<{ bonusPercent: number }>> =>
+      request<{ bonusPercent: number }>(`/api/reputation/${worldId}/bonus`, {}, true),
+  },
+
+  licenses: {
+    getTypes: (): Promise<ApiResponse<LicenseTypeResponse[]>> =>
+      request<LicenseTypeResponse[]>('/api/licenses/types', {}, true),
+
+    getShop: (worldId: string): Promise<ApiResponse<LicenseShopResponse>> =>
+      request<LicenseShopResponse>(`/api/licenses/shop/${worldId}`, {}, true),
+
+    getMyLicenses: (worldId: string): Promise<ApiResponse<UserLicenseResponse[]>> =>
+      request<UserLicenseResponse[]>(`/api/licenses/my/${worldId}`, {}, true),
+
+    checkLicense: (worldId: string, licenseCode: string): Promise<ApiResponse<LicenseCheckResponse>> =>
+      request<LicenseCheckResponse>(`/api/licenses/check/${worldId}/${licenseCode}`, {}, true),
+
+    renew: (worldId: string, licenseId: string): Promise<ApiResponse<UserLicenseResponse>> =>
+      request<UserLicenseResponse>(`/api/licenses/renew/${worldId}/${licenseId}`, {
+        method: 'POST',
+      }, true),
+  },
+
+  exams: {
+    schedule: (data: ScheduleExamRequest): Promise<ApiResponse<LicenseExamResponse>> =>
+      request<LicenseExamResponse>('/api/exams/schedule', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }, true),
+
+    start: (examId: string): Promise<ApiResponse<LicenseExamResponse>> =>
+      request<LicenseExamResponse>(`/api/exams/${examId}/start`, {
+        method: 'POST',
+      }, true),
+
+    recordViolation: (examId: string, data: RecordViolationRequest): Promise<ApiResponse<ExamViolationResponse>> =>
+      request<ExamViolationResponse>(`/api/exams/${examId}/violation`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }, true),
+
+    recordLanding: (examId: string, data: RecordLandingRequest): Promise<ApiResponse<ExamLandingResponse>> =>
+      request<ExamLandingResponse>(`/api/exams/${examId}/landing`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }, true),
+
+    complete: (examId: string): Promise<ApiResponse<ExamCompletionResponse>> =>
+      request<ExamCompletionResponse>(`/api/exams/${examId}/complete`, {
+        method: 'POST',
+      }, true),
+
+    abandon: (examId: string): Promise<ApiResponse<{ message: string }>> =>
+      request<{ message: string }>(`/api/exams/${examId}/abandon`, {
+        method: 'POST',
+      }, true),
+
+    get: (examId: string): Promise<ApiResponse<LicenseExamResponse>> =>
+      request<LicenseExamResponse>(`/api/exams/${examId}`, {}, true),
+
+    getHistory: (worldId: string): Promise<ApiResponse<LicenseExamResponse[]>> =>
+      request<LicenseExamResponse[]>(`/api/exams/history/${worldId}`, {}, true),
+
+    getActive: (worldId: string): Promise<ApiResponse<LicenseExamResponse>> =>
+      request<LicenseExamResponse>(`/api/exams/active/${worldId}`, {}, true),
+  },
 };
 
 // World types
@@ -752,6 +1173,9 @@ export type {
   AirportListResponse,
   Job,
   JobAirport,
+  JobSearchParams,
+  JobSearchResult,
+  JobStatsResult,
   AcceptJobResponse,
   CompleteJobResponse,
   AuthResponse,
@@ -771,5 +1195,22 @@ export type {
   PurchaseAircraftResponse,
   CargoTypeResponse,
   MarketplaceSearchParams,
-  MarketplaceSearchResult
+  MarketplaceSearchResult,
+  PlayerSkillResponse,
+  SkillXpEventResponse,
+  ReputationStatusResponse,
+  ReputationBenefitResponse,
+  ReputationEventResponse,
+  LicenseTypeResponse,
+  UserLicenseResponse,
+  LicenseShopResponse,
+  LicenseShopItemResponse,
+  LicenseCheckResponse,
+  LicenseExamResponse,
+  ExamViolationResponse,
+  ExamLandingResponse,
+  ScheduleExamRequest,
+  RecordViolationRequest,
+  RecordLandingRequest,
+  ExamCompletionResponse
 };

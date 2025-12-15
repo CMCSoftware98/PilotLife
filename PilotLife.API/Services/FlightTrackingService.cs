@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using PilotLife.Application.FlightTracking;
 using PilotLife.Application.FlightTracking.DTOs;
+using PilotLife.Application.Maintenance;
+using PilotLife.Application.Reputation;
+using PilotLife.Application.Skills;
 using PilotLife.Database.Data;
 using PilotLife.Domain.Entities;
 using PilotLife.Domain.Enums;
@@ -11,16 +14,27 @@ public class FlightTrackingService : IFlightTrackingService
 {
     private readonly PilotLifeDbContext _context;
     private readonly ILogger<FlightTrackingService> _logger;
+    private readonly IMaintenanceService? _maintenanceService;
+    private readonly IReputationService? _reputationService;
+    private readonly ISkillsService? _skillsService;
 
     // Thresholds for state determination
     private const double TaxiSpeedKts = 30;
     private const double ClimbAltitudeFt = 1000;
     private const double ApproachAltitudeFt = 3000;
 
-    public FlightTrackingService(PilotLifeDbContext context, ILogger<FlightTrackingService> logger)
+    public FlightTrackingService(
+        PilotLifeDbContext context,
+        ILogger<FlightTrackingService> logger,
+        IMaintenanceService? maintenanceService = null,
+        IReputationService? reputationService = null,
+        ISkillsService? skillsService = null)
     {
         _context = context;
         _logger = logger;
+        _maintenanceService = maintenanceService;
+        _reputationService = reputationService;
+        _skillsService = skillsService;
     }
 
     public async Task<FlightUpdateResponse> StartFlightAsync(Guid userId, FlightStartData data, CancellationToken cancellationToken = default)
@@ -252,6 +266,12 @@ public class FlightTrackingService : IFlightTrackingService
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        // Apply maintenance wear to owned aircraft (if flying one)
+        await ApplyMaintenanceWearAsync(flight, data, cancellationToken);
+
+        // Process reputation and skills for the completed flight
+        await ProcessReputationAndSkillsAsync(flight, cancellationToken);
+
         _logger.LogInformation("Flight {FlightId} ended with state {State} at {Airport}. Duration: {Minutes} min",
             flight.Id, flight.State, flight.ArrivalIcao ?? "unknown", flight.FlightTimeMinutes);
 
@@ -262,6 +282,106 @@ public class FlightTrackingService : IFlightTrackingService
             State = flight.State.ToString(),
             Message = data.WasCrash ? "Flight ended (crash)" : "Flight completed successfully"
         };
+    }
+
+    /// <summary>
+    /// Applies maintenance wear to an owned aircraft after a flight completes.
+    /// </summary>
+    private async Task ApplyMaintenanceWearAsync(TrackedFlight flight, FlightEndData data, CancellationToken cancellationToken)
+    {
+        if (_maintenanceService == null || flight.AircraftId == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Find the owned aircraft that was used for this flight
+            // Match by aircraft template, user, and departure location
+            var ownedAircraft = await _context.OwnedAircraft
+                .Include(a => a.Owner)
+                .Where(a => a.AircraftId == flight.AircraftId &&
+                           a.Owner.UserId == flight.UserId &&
+                           a.CurrentLocationIcao == flight.DepartureIcao)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (ownedAircraft == null)
+            {
+                _logger.LogDebug("No owned aircraft found for flight {FlightId}, skipping maintenance wear", flight.Id);
+                return;
+            }
+
+            // Apply wear and tear
+            await _maintenanceService.ApplyFlightWearAsync(
+                ownedAircraft.Id,
+                flight.FlightTimeMinutes,
+                (int?)flight.LandingRate,
+                flight.OverspeedCount > 0,
+                flight.StallWarningCount > 0,
+                cancellationToken);
+
+            // Update the aircraft's location to the arrival airport
+            if (!string.IsNullOrEmpty(flight.ArrivalIcao))
+            {
+                ownedAircraft.CurrentLocationIcao = flight.ArrivalIcao;
+                ownedAircraft.LastMovedAt = DateTimeOffset.UtcNow;
+
+                // Update flight time on the aircraft
+                ownedAircraft.TotalFlightMinutes += flight.FlightTimeMinutes;
+                ownedAircraft.TotalCycles++;
+
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            _logger.LogInformation(
+                "Applied maintenance wear to aircraft {AircraftId} after flight {FlightId}. New location: {Location}",
+                ownedAircraft.Id, flight.Id, flight.ArrivalIcao);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error applying maintenance wear for flight {FlightId}", flight.Id);
+            // Don't fail the flight completion due to maintenance errors
+        }
+    }
+
+    /// <summary>
+    /// Processes reputation and skill XP awards for a completed flight.
+    /// </summary>
+    private async Task ProcessReputationAndSkillsAsync(TrackedFlight flight, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Find the player's world to get the PlayerWorldId
+            var playerWorld = await _context.PlayerWorlds
+                .FirstOrDefaultAsync(pw => pw.UserId == flight.UserId, cancellationToken);
+
+            if (playerWorld == null)
+            {
+                _logger.LogDebug("No player world found for user {UserId}, skipping reputation/skills processing", flight.UserId);
+                return;
+            }
+
+            // Process reputation events
+            if (_reputationService != null)
+            {
+                await _reputationService.ProcessFlightCompletedAsync(playerWorld.Id, flight, cancellationToken);
+            }
+
+            // Process skill XP awards
+            if (_skillsService != null)
+            {
+                await _skillsService.ProcessFlightCompletedAsync(playerWorld.Id, flight, cancellationToken);
+            }
+
+            _logger.LogInformation(
+                "Processed reputation and skills for flight {FlightId}, player world {PlayerWorldId}",
+                flight.Id, playerWorld.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing reputation/skills for flight {FlightId}", flight.Id);
+            // Don't fail the flight completion due to reputation/skills errors
+        }
     }
 
     public async Task<TrackedFlight?> GetActiveFlightAsync(Guid userId, CancellationToken cancellationToken = default)

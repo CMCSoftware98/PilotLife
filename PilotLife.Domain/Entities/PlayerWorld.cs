@@ -119,8 +119,74 @@ public class PlayerWorld : BaseEntity
     public int? HomeAirportId { get; set; }
     public Airport? HomeAirport { get; set; }
 
-    // Navigation properties for owned items (will be added in later phases)
-    // public ICollection<OwnedAircraft> OwnedAircraft { get; set; }
-    // public ICollection<UserLicense> Licenses { get; set; }
-    // public ICollection<Loan> Loans { get; set; }
+    // Navigation properties
+    /// <summary>
+    /// Loans taken by this player in this world.
+    /// </summary>
+    public ICollection<Loan> Loans { get; set; } = new List<Loan>();
+
+    /// <summary>
+    /// Credit score history events.
+    /// </summary>
+    public ICollection<CreditScoreEvent> CreditScoreEvents { get; set; } = new List<CreditScoreEvent>();
+
+    /// <summary>
+    /// Player's skills and their levels.
+    /// </summary>
+    public ICollection<PlayerSkill> Skills { get; set; } = new List<PlayerSkill>();
+
+    /// <summary>
+    /// Reputation events history.
+    /// </summary>
+    public ICollection<ReputationEvent> ReputationEvents { get; set; } = new List<ReputationEvent>();
+
+    // Calculated properties
+    /// <summary>
+    /// Gets the reputation level (1-5) based on the score.
+    /// </summary>
+    public int ReputationLevel => ReputationScore switch
+    {
+        < 1.0m => 1,
+        < 2.0m => 2,
+        < 3.0m => 3,
+        < 4.0m => 4,
+        _ => 5
+    };
+
+    /// <summary>
+    /// Gets the reputation level name.
+    /// </summary>
+    public string ReputationLevelName => ReputationLevel switch
+    {
+        1 => "Unreliable",
+        2 => "Novice",
+        3 => "Standard",
+        4 => "Trusted",
+        5 => "Elite",
+        _ => "Unknown"
+    };
+
+    /// <summary>
+    /// Gets the job completion rate as a percentage.
+    /// </summary>
+    public double JobCompletionRate
+    {
+        get
+        {
+            var totalJobs = OnTimeDeliveries + LateDeliveries + FailedDeliveries;
+            return totalJobs > 0 ? (double)(OnTimeDeliveries + LateDeliveries) / totalJobs * 100 : 100;
+        }
+    }
+
+    /// <summary>
+    /// Gets the on-time delivery rate as a percentage.
+    /// </summary>
+    public double OnTimeRate
+    {
+        get
+        {
+            var totalDeliveries = OnTimeDeliveries + LateDeliveries;
+            return totalDeliveries > 0 ? (double)OnTimeDeliveries / totalDeliveries * 100 : 100;
+        }
+    }
 }

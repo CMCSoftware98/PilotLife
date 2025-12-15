@@ -1,175 +1,75 @@
 <template>
-  <div class="jobs-layout">
-    <div class="jobs-list-panel">
-      <div class="panel-header">
-        <h2 class="panel-title">Available Jobs</h2>
-        <p class="panel-subtitle">Select a job to see the route on the map</p>
-      </div>
-
-      <div class="filters">
-        <v-select
-          v-model="selectedCargoType"
-          :items="cargoTypeOptions"
-          label="Cargo Type"
-          variant="outlined"
-          density="compact"
-          clearable
-          hide-details
-          class="filter-select"
-        />
-        <v-select
-          v-model="selectedUrgency"
-          :items="urgencyOptions"
-          label="Urgency"
-          variant="outlined"
-          density="compact"
-          clearable
-          hide-details
-          class="filter-select"
-        />
-      </div>
-
-      <div v-if="loading" class="loading-state">
-        <v-progress-circular indeterminate color="primary" />
-        <span>Loading jobs...</span>
-      </div>
-
-      <div v-else-if="jobs.length === 0" class="empty-state">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="empty-icon">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14,2 14,8 20,8"/>
-          <line x1="12" y1="18" x2="12" y2="12"/>
-          <line x1="9" y1="15" x2="15" y2="15"/>
-        </svg>
-        <p>No jobs available at your location</p>
-      </div>
-
-      <div v-else class="jobs-scroll">
-        <div
-          v-for="job in jobs"
-          :key="job.id"
-          class="job-card"
-          :class="{ selected: selectedJob?.id === job.id, [getUrgencyClass(job.urgency)]: true }"
-          @click="selectJob(job)"
-        >
-          <div class="job-header">
-            <div class="job-type-badge" :class="getJobTypeClass(job.type)">
-              {{ job.type || 'Cargo' }}
-            </div>
-            <div v-if="job.urgency && job.urgency !== 'Standard'" class="urgency-badge" :class="getUrgencyBadgeClass(job.urgency)">
-              {{ job.urgency }}
-            </div>
-          </div>
-
-          <div class="job-route">
-            <span class="airport-code">{{ job.departureAirport.iataCode || job.departureAirport.ident }}</span>
-            <div class="route-line">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </div>
-            <span class="airport-code">{{ job.arrivalAirport.iataCode || job.arrivalAirport.ident }}</span>
-          </div>
-
-          <div class="job-details">
-            <div class="detail-row">
-              <span class="detail-label">Distance</span>
-              <span class="detail-value">
-                {{ Math.round(job.distanceNm) }} nm
-                <span v-if="job.distanceCategory" class="distance-category">({{ formatDistanceCategory(job.distanceCategory) }})</span>
-              </span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Flight Time</span>
-              <span class="detail-value">{{ formatFlightTime(job.estimatedFlightTimeMinutes) }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">{{ job.type === 'Passenger' ? 'Passengers' : 'Cargo' }}</span>
-              <span class="detail-value cargo-badge">
-                {{ job.type === 'Passenger' ? `${job.passengerCount} pax` : job.cargoType }}
-              </span>
-            </div>
-            <div v-if="job.type === 'Passenger' && job.passengerClass" class="detail-row">
-              <span class="detail-label">Class</span>
-              <span class="detail-value passenger-class" :class="getPassengerClassStyle(job.passengerClass)">
-                {{ job.passengerClass }}
-              </span>
-            </div>
-            <div v-if="job.type !== 'Passenger'" class="detail-row">
-              <span class="detail-label">Weight</span>
-              <span class="detail-value">{{ (job.weight || 0).toLocaleString() }} lbs</span>
-            </div>
-            <div v-if="job.riskLevel && job.riskLevel > 1" class="detail-row">
-              <span class="detail-label">Risk</span>
-              <span class="detail-value risk-level" :class="getRiskClass(job.riskLevel)">
-                {{ getRiskLabel(job.riskLevel) }}
-              </span>
-            </div>
-          </div>
-
-          <div class="job-footer">
-            <div class="payout">
-              <span class="payout-label">Payout</span>
-              <span class="payout-value" :class="{ 'high-payout': isHighPayout(job) }">${{ job.payout.toLocaleString() }}</span>
-            </div>
-            <v-btn
-              size="small"
-              color="primary"
-              class="accept-btn"
-              @click.stop="acceptJob(job)"
-              :loading="acceptingJobId === job.id"
-            >
-              Accept
-            </v-btn>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="map-panel">
+  <div class="jobs-view">
+    <!-- Map Section (Compact) -->
+    <div class="map-section" :style="{ height: `${jobsConfig.config.value.mapHeight}vh` }">
       <l-map
         ref="mapRef"
         :zoom="zoom"
         :center="mapCenter"
         :use-global-leaflet="false"
         class="leaflet-map"
+        @ready="onMapReady"
+        @moveend="onMapMoveEnd"
+        @zoomend="onZoomEnd"
       >
         <l-tile-layer
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           attribution="&copy; OpenStreetMap contributors &copy; CARTO"
         />
 
+        <!-- Vicinity circle -->
+        <l-circle
+          v-if="mapReady && !isUnmounting && selectedAirport && jobsConfig.config.value.showVicinityCircle"
+          :lat-lng="[selectedAirport.latitude, selectedAirport.longitude]"
+          :radius="jobsConfig.config.value.vicinityRadiusNm * 1852"
+          :color="'#3b82f6'"
+          :fill-color="'#3b82f6'"
+          :fill-opacity="0.1"
+          :weight="1"
+          :dash-array="'5, 5'"
+        />
+
+        <!-- Airport markers -->
+        <template v-if="mapReady && !isUnmounting && visibleAirports.length > 0">
+          <l-marker
+            v-for="airport in visibleAirports"
+            :key="`airport-${airport.id}`"
+            :lat-lng="[airport.latitude, airport.longitude]"
+            @click="selectAirport(airport)"
+          >
+            <l-icon
+              :icon-url="getAirportIcon(airport)"
+              :icon-size="getAirportIconSize(airport)"
+              :icon-anchor="getAirportIconAnchor(airport)"
+            />
+            <l-popup>
+              <div class="airport-popup">
+                <strong>{{ airport.ident }}</strong>
+                <span class="airport-name">{{ airport.name }}</span>
+                <span class="airport-type">{{ formatAirportType(airport.type) }}</span>
+              </div>
+            </l-popup>
+          </l-marker>
+        </template>
+
+        <!-- Current location marker -->
         <l-marker
-          v-if="currentAirport"
+          v-if="mapReady && !isUnmounting && currentAirport"
+          :key="`current-${currentAirport.id}`"
           :lat-lng="[currentAirport.latitude, currentAirport.longitude]"
         >
-          <l-icon :icon-url="currentLocationIcon" :icon-size="[32, 32]" :icon-anchor="[16, 16]" />
+          <l-icon :icon-url="currentLocationIcon" :icon-size="[28, 28]" :icon-anchor="[14, 14]" />
           <l-popup>
             <strong>{{ currentAirport.name }}</strong><br>
             <span>Your current location</span>
           </l-popup>
         </l-marker>
 
-        <template v-if="selectedJob">
-          <l-marker :lat-lng="[selectedJob.departureAirport.latitude, selectedJob.departureAirport.longitude]">
-            <l-icon :icon-url="departureIcon" :icon-size="[28, 28]" :icon-anchor="[14, 14]" />
-            <l-popup>
-              <strong>{{ selectedJob.departureAirport.name }}</strong><br>
-              <span>Departure</span>
-            </l-popup>
-          </l-marker>
-
-          <l-marker :lat-lng="[selectedJob.arrivalAirport.latitude, selectedJob.arrivalAirport.longitude]">
-            <l-icon :icon-url="arrivalIcon" :icon-size="[28, 28]" :icon-anchor="[14, 14]" />
-            <l-popup>
-              <strong>{{ selectedJob.arrivalAirport.name }}</strong><br>
-              <span>Arrival</span>
-            </l-popup>
-          </l-marker>
-
+        <!-- Selected job route -->
+        <template v-if="mapReady && !isUnmounting && selectedJob">
           <l-polyline
             :lat-lngs="routeLine"
-            :color="'#3b82f6'"
+            :color="'#22c55e'"
             :weight="3"
             :opacity="0.8"
             :dash-array="'10, 10'"
@@ -177,58 +77,338 @@
         </template>
       </l-map>
 
-      <div v-if="selectedJob" class="map-info-panel">
-        <h3>{{ selectedJob.departureAirport.name }}</h3>
-        <div class="route-arrow">to</div>
-        <h3>{{ selectedJob.arrivalAirport.name }}</h3>
+      <!-- Map Controls Overlay -->
+      <div class="map-controls">
+        <div class="selected-info" v-if="selectedAirport">
+          <span class="airport-code">{{ selectedAirport.ident }}</span>
+          <span class="airport-label">{{ selectedAirport.name }}</span>
+          <button class="clear-btn" @click="clearSelection">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="map-stats">
+          <span>{{ visibleAirports.length }} airports</span>
+          <span class="divider">|</span>
+          <span>{{ searchResult?.totalCount || 0 }} jobs</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Jobs Table Section -->
+    <div class="jobs-section">
+      <!-- Filters Bar -->
+      <div class="filters-bar">
+        <div class="filters-row">
+          <div class="filter-group">
+            <label>Type</label>
+            <select v-model="filters.jobType" @change="loadJobs">
+              <option :value="undefined">All</option>
+              <option value="Cargo">Cargo</option>
+              <option value="Passenger">Passenger</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label>Urgency</label>
+            <select v-model="filters.urgency" @change="loadJobs">
+              <option :value="undefined">All</option>
+              <option value="Standard">Standard</option>
+              <option value="Priority">Priority</option>
+              <option value="Express">Express</option>
+              <option value="Urgent">Urgent</option>
+              <option value="Critical">Critical</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label>Min Payout</label>
+            <input
+              type="number"
+              v-model.number="filters.minPayout"
+              placeholder="$0"
+              @change="loadJobs"
+            />
+          </div>
+
+          <div class="filter-group">
+            <label>Max Distance</label>
+            <input
+              type="number"
+              v-model.number="filters.maxDistanceNm"
+              placeholder="nm"
+              @change="loadJobs"
+            />
+          </div>
+
+          <div class="filter-group">
+            <label>Departure</label>
+            <input
+              type="text"
+              v-model="filters.departureIcao"
+              placeholder="ICAO"
+              maxlength="4"
+              @change="loadJobs"
+            />
+          </div>
+
+          <div class="filter-group">
+            <label>Arrival</label>
+            <input
+              type="text"
+              v-model="filters.arrivalIcao"
+              placeholder="ICAO"
+              maxlength="4"
+              @change="loadJobs"
+            />
+          </div>
+
+          <div class="filter-group vicinity-group">
+            <label>Vicinity (nm)</label>
+            <input
+              type="number"
+              v-model.number="vicinityRadius"
+              min="25"
+              max="500"
+              step="25"
+              @change="onVicinityChange"
+            />
+          </div>
+
+          <button class="reset-btn" @click="resetFilters">Reset</button>
+        </div>
+      </div>
+
+      <!-- Jobs Table -->
+      <div class="jobs-table-container">
+        <table class="jobs-table">
+          <thead>
+            <tr>
+              <th class="col-route">Route</th>
+              <th class="col-type sortable" @click="sortBy('type')">
+                Type
+                <span v-if="currentSort === 'type'" class="sort-icon">{{ sortDesc ? '↓' : '↑' }}</span>
+              </th>
+              <th class="col-urgency sortable" @click="sortBy('urgency')">
+                Urgency
+                <span v-if="currentSort === 'urgency'" class="sort-icon">{{ sortDesc ? '↓' : '↑' }}</span>
+              </th>
+              <th class="col-cargo">Cargo/Pax</th>
+              <th class="col-weight sortable" @click="sortBy('weight')">
+                Weight
+                <span v-if="currentSort === 'weight'" class="sort-icon">{{ sortDesc ? '↓' : '↑' }}</span>
+              </th>
+              <th class="col-distance sortable" @click="sortBy('distance')">
+                Distance
+                <span v-if="currentSort === 'distance'" class="sort-icon">{{ sortDesc ? '↓' : '↑' }}</span>
+              </th>
+              <th class="col-payout sortable" @click="sortBy('payout')">
+                Payout
+                <span v-if="currentSort === 'payout'" class="sort-icon">{{ sortDesc ? '↓' : '↑' }}</span>
+              </th>
+              <th class="col-expiry sortable" @click="sortBy('expiry')">
+                Expires
+                <span v-if="currentSort === 'expiry'" class="sort-icon">{{ sortDesc ? '↓' : '↑' }}</span>
+              </th>
+              <th class="col-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="9" class="loading-cell">
+                <v-progress-circular indeterminate color="primary" size="24" />
+                <span>Loading jobs...</span>
+              </td>
+            </tr>
+            <tr v-else-if="jobs.length === 0">
+              <td colspan="9" class="empty-cell">
+                <span>No jobs found. Try adjusting your filters or selecting an airport.</span>
+              </td>
+            </tr>
+            <tr
+              v-else
+              v-for="job in jobs"
+              :key="job.id"
+              :class="{ selected: selectedJob?.id === job.id, [getUrgencyRowClass(job.urgency)]: true }"
+              @click="selectJob(job)"
+            >
+              <td class="col-route">
+                <div class="route-cell">
+                  <span class="icao from">{{ job.departureAirport.ident }}</span>
+                  <span class="arrow">→</span>
+                  <span class="icao to">{{ job.arrivalAirport.ident }}</span>
+                </div>
+              </td>
+              <td class="col-type">
+                <span class="type-badge" :class="job.type ? String(job.type).toLowerCase() : ''">{{ job.type || '-' }}</span>
+              </td>
+              <td class="col-urgency">
+                <span class="urgency-badge" :class="job.urgency ? String(job.urgency).toLowerCase() : 'standard'">{{ job.urgency || 'Standard' }}</span>
+              </td>
+              <td class="col-cargo">
+                <span v-if="job.type === 'Passenger'">{{ job.passengerCount }} pax</span>
+                <span v-else class="cargo-name">{{ job.cargoType }}</span>
+              </td>
+              <td class="col-weight">{{ formatWeight(job.weightLbs || job.weight) }}</td>
+              <td class="col-distance">{{ Math.round(job.distanceNm) }} nm</td>
+              <td class="col-payout">
+                <span class="payout" :class="{ high: isHighPayout(job) }">
+                  ${{ job.payout.toLocaleString() }}
+                </span>
+              </td>
+              <td class="col-expiry">{{ formatExpiry(job.expiresAt) }}</td>
+              <td class="col-actions">
+                <button
+                  class="accept-btn"
+                  @click.stop="acceptJob(job)"
+                  :disabled="acceptingJobId === job.id"
+                >
+                  {{ acceptingJobId === job.id ? '...' : 'Accept' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination-bar" v-if="searchResult && searchResult.totalPages > 1">
+        <div class="pagination-info">
+          Showing {{ (currentPage - 1) * pageSize + 1 }}-{{ Math.min(currentPage * pageSize, searchResult.totalCount) }}
+          of {{ searchResult.totalCount }} jobs
+        </div>
+        <div class="pagination-controls">
+          <button :disabled="currentPage <= 1" @click="goToPage(1)">First</button>
+          <button :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">Prev</button>
+          <span class="page-info">Page {{ currentPage }} of {{ searchResult.totalPages }}</span>
+          <button :disabled="currentPage >= searchResult.totalPages" @click="goToPage(currentPage + 1)">Next</button>
+          <button :disabled="currentPage >= searchResult.totalPages" @click="goToPage(searchResult.totalPages)">Last</button>
+          <select v-model="pageSize" @change="onPageSizeChange" class="page-size-select">
+            <option :value="20">20</option>
+            <option :value="25">25</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Panel (collapsible) -->
+    <div class="settings-panel" :class="{ expanded: showSettings }">
+      <button class="settings-toggle" @click="showSettings = !showSettings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/>
+        </svg>
+        Settings
+      </button>
+      <div class="settings-content" v-if="showSettings">
+        <div class="setting-row">
+          <label>Map Height (%)</label>
+          <input
+            type="range"
+            min="20"
+            max="60"
+            v-model.number="jobsConfig.config.value.mapHeight"
+            @change="saveConfig"
+          />
+          <span>{{ jobsConfig.config.value.mapHeight }}%</span>
+        </div>
+        <div class="setting-row">
+          <label>Default Vicinity (nm)</label>
+          <input
+            type="number"
+            min="25"
+            max="500"
+            step="25"
+            v-model.number="jobsConfig.config.value.vicinityRadiusNm"
+            @change="saveConfig"
+          />
+        </div>
+        <div class="setting-row">
+          <label>Max Airports on Map</label>
+          <input
+            type="number"
+            min="100"
+            max="1000"
+            step="100"
+            v-model.number="jobsConfig.config.value.maxAirportsOnMap"
+            @change="saveConfig"
+          />
+        </div>
+        <div class="setting-row">
+          <label>Show Vicinity Circle</label>
+          <input
+            type="checkbox"
+            v-model="jobsConfig.config.value.showVicinityCircle"
+            @change="saveConfig"
+          />
+        </div>
+        <button class="reset-settings-btn" @click="resetSettings">Reset to Defaults</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { LMap, LTileLayer, LMarker, LIcon, LPopup, LPolyline } from '@vue-leaflet/vue-leaflet'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { LMap, LTileLayer, LMarker, LIcon, LPopup, LPolyline, LCircle } from '@vue-leaflet/vue-leaflet'
 import 'leaflet/dist/leaflet.css'
-import { api, type Job, type Airport } from '../services/api'
+import { api, type Job, type Airport, type JobSearchResult } from '../services/api'
 import { useUserStore } from '../stores/user'
+import { useWorldStore } from '../stores/world'
+import { useJobsConfigStore } from '../stores/jobsConfig'
 
 const userStore = useUserStore()
+const worldStore = useWorldStore()
+const jobsConfig = useJobsConfigStore()
 
-const jobs = ref<Job[]>([])
+// Map state
+const mapRef = ref()
+const mapReady = ref(false)
+const isUnmounting = ref(false)
+const zoom = ref(jobsConfig.config.value.defaultZoom)
+const mapCenter = ref<[number, number]>([40, -95])
+const visibleAirports = ref<Airport[]>([])
+
+// Selection state
+const selectedAirport = ref<Airport | null>(null)
 const selectedJob = ref<Job | null>(null)
-const loading = ref(true)
+
+// Jobs state
+const jobs = ref<Job[]>([])
+const searchResult = ref<JobSearchResult | null>(null)
+const loading = ref(false)
 const acceptingJobId = ref<string | null>(null)
 
-const selectedCargoType = ref<string | null>(null)
-const selectedUrgency = ref<string | null>(null)
+// Pagination
+const currentPage = ref(1)
+const pageSize = ref(jobsConfig.config.value.pageSize)
 
-const cargoTypeOptions = [
-  { title: 'General Cargo', value: 'GeneralCargo' },
-  { title: 'Perishable', value: 'Perishable' },
-  { title: 'Hazardous', value: 'Hazardous' },
-  { title: 'Live Animals', value: 'LiveAnimals' },
-  { title: 'Medical', value: 'Medical' },
-  { title: 'High Value', value: 'HighValue' },
-  { title: 'Fragile', value: 'Fragile' },
-  { title: 'Mail', value: 'Mail' },
-  { title: 'Parcels', value: 'Parcels' },
-]
+// Sorting
+const currentSort = ref<string>(jobsConfig.config.value.defaultSortBy)
+const sortDesc = ref(jobsConfig.config.value.defaultSortDescending)
 
-const urgencyOptions = [
-  { title: 'Standard', value: 'Standard' },
-  { title: 'Priority (1.2x)', value: 'Priority' },
-  { title: 'Express (1.5x)', value: 'Express' },
-  { title: 'Urgent (2x)', value: 'Urgent' },
-  { title: 'Critical (3x)', value: 'Critical' },
-]
+// Filters
+const filters = ref({
+  jobType: undefined as 'Cargo' | 'Passenger' | undefined,
+  urgency: undefined as string | undefined,
+  minPayout: undefined as number | undefined,
+  maxDistanceNm: undefined as number | undefined,
+  departureIcao: '',
+  arrivalIcao: '',
+})
 
-const mapRef = ref()
-const zoom = ref(4)
-const mapCenter = ref<[number, number]>([40, -95])
+const vicinityRadius = ref(jobsConfig.config.value.vicinityRadiusNm)
+const showSettings = ref(false)
 
+// Computed
 const currentAirport = computed((): Airport | null => {
-  return userStore.user.value?.currentAirport || null
+  return worldStore.currentPlayerWorld.value?.currentAirportId
+    ? visibleAirports.value.find(a => a.id === worldStore.currentPlayerWorld.value?.currentAirportId) || null
+    : null
 })
 
 const routeLine = computed((): [number, number][] => {
@@ -244,105 +424,174 @@ const currentLocationIcon = computed(() => {
   return `data:image/svg+xml;base64,${btoa(svg)}`
 })
 
-const departureIcon = computed(() => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3b82f6"><circle cx="12" cy="12" r="10" fill="#3b82f6"/><path d="M8 12l4-4 4 4M12 16V8" stroke="white" stroke-width="2" fill="none"/></svg>`
+// Airport icon helpers
+function getAirportIcon(airport: Airport): string {
+  const isSelected = selectedAirport.value?.id === airport.id
+  const color = isSelected ? '#f59e0b' : airport.type === 'large_airport' ? '#3b82f6' : airport.type === 'medium_airport' ? '#8b5cf6' : '#6b7280'
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}"><circle cx="12" cy="12" r="8" fill="${color}"/><circle cx="12" cy="12" r="3" fill="white"/></svg>`
   return `data:image/svg+xml;base64,${btoa(svg)}`
-})
-
-const arrivalIcon = computed(() => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ef4444"><circle cx="12" cy="12" r="10" fill="#ef4444"/><path d="M8 12l4 4 4-4M12 8v8" stroke="white" stroke-width="2" fill="none"/></svg>`
-  return `data:image/svg+xml;base64,${btoa(svg)}`
-})
-
-function formatFlightTime(minutes: number): string {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  if (hours === 0) return `${mins}m`
-  return `${hours}h ${mins}m`
 }
 
-function formatDistanceCategory(category?: string): string {
-  if (!category) return ''
-  return category.replace(/([A-Z])/g, ' $1').trim()
+function getAirportIconSize(airport: Airport): [number, number] {
+  if (selectedAirport.value?.id === airport.id) return [24, 24]
+  if (airport.type === 'large_airport') return [20, 20]
+  if (airport.type === 'medium_airport') return [16, 16]
+  return [12, 12]
 }
 
-function getUrgencyClass(urgency?: string): string {
-  if (!urgency || urgency === 'Standard') return ''
-  return `urgency-${urgency.toLowerCase()}`
+function getAirportIconAnchor(airport: Airport): [number, number] {
+  const size = getAirportIconSize(airport)
+  return [size[0] / 2, size[1] / 2]
 }
 
-function getUrgencyBadgeClass(urgency?: string): string {
-  switch (urgency) {
-    case 'Priority': return 'urgency-badge-priority'
-    case 'Express': return 'urgency-badge-express'
-    case 'Urgent': return 'urgency-badge-urgent'
-    case 'Critical': return 'urgency-badge-critical'
-    default: return ''
-  }
+function formatAirportType(type: string): string {
+  return type.replace('_airport', '').replace('_', ' ')
 }
 
-function getJobTypeClass(type?: string): string {
-  return type === 'Passenger' ? 'job-type-passenger' : 'job-type-cargo'
+// Map event handlers
+function onMapReady() {
+  mapReady.value = true
+  loadAirportsInView()
 }
 
-function getPassengerClassStyle(passengerClass?: string): string {
-  switch (passengerClass) {
-    case 'First':
-    case 'Vip': return 'class-premium'
-    case 'Business': return 'class-business'
-    default: return 'class-economy'
-  }
+async function onMapMoveEnd() {
+  if (!mapReady.value) return
+  await loadAirportsInView()
 }
 
-function getRiskClass(riskLevel?: number): string {
-  if (!riskLevel) return ''
-  if (riskLevel >= 4) return 'risk-high'
-  if (riskLevel >= 3) return 'risk-medium'
-  return 'risk-low'
+async function onZoomEnd() {
+  if (!mapReady.value) return
+  zoom.value = mapRef.value?.leafletObject?.getZoom() || zoom.value
+  await loadAirportsInView()
 }
 
-function getRiskLabel(riskLevel?: number): string {
-  if (!riskLevel) return 'Low'
-  if (riskLevel >= 4) return 'High'
-  if (riskLevel >= 3) return 'Medium'
-  return 'Low'
-}
+async function loadAirportsInView() {
+  if (!mapReady.value || !mapRef.value?.leafletObject) return
 
-function isHighPayout(job: Job): boolean {
-  return job.payout >= 10000 || (job.urgency !== undefined && job.urgency !== 'Standard')
-}
-
-async function loadJobs() {
-  if (!userStore.user.value?.currentAirportId) {
-    loading.value = false
-    return
-  }
-
-  loading.value = true
-  const response = await api.jobs.getAvailable({
-    airportId: userStore.user.value.currentAirportId,
-    cargoType: selectedCargoType.value || undefined,
-    aircraftType: selectedAircraftType.value || undefined
+  const bounds = mapRef.value.leafletObject.getBounds()
+  const response = await api.airports.getInBounds({
+    north: bounds.getNorth(),
+    south: bounds.getSouth(),
+    east: bounds.getEast(),
+    west: bounds.getWest(),
+    zoomLevel: zoom.value,
+    limit: jobsConfig.config.value.maxAirportsOnMap,
   })
 
   if (response.data) {
-    jobs.value = response.data
+    visibleAirports.value = response.data
   }
-  loading.value = false
+}
+
+// Selection handlers
+function selectAirport(airport: Airport) {
+  selectedAirport.value = airport
+  selectedJob.value = null
+  currentPage.value = 1
+  loadJobs()
+}
+
+function clearSelection() {
+  selectedAirport.value = null
+  selectedJob.value = null
+  loadJobs()
 }
 
 function selectJob(job: Job) {
   selectedJob.value = job
 
+  // Fit map to show both airports
   if (mapRef.value?.leafletObject) {
     const bounds = [
       [job.departureAirport.latitude, job.departureAirport.longitude],
       [job.arrivalAirport.latitude, job.arrivalAirport.longitude]
     ]
-    mapRef.value.leafletObject.fitBounds(bounds, { padding: [50, 50] })
+    mapRef.value.leafletObject.fitBounds(bounds, { padding: [30, 30], maxZoom: 8 })
   }
 }
 
+// Job loading
+async function loadJobs() {
+  if (!worldStore.currentPlayerWorld.value?.worldId) return
+
+  loading.value = true
+
+  const params: any = {
+    worldId: worldStore.currentPlayerWorld.value.worldId,
+    sortBy: currentSort.value,
+    sortDescending: sortDesc.value,
+    page: currentPage.value,
+    pageSize: pageSize.value,
+  }
+
+  // Apply filters
+  if (filters.value.jobType) params.jobType = filters.value.jobType
+  if (filters.value.urgency) params.urgency = filters.value.urgency
+  if (filters.value.minPayout) params.minPayout = filters.value.minPayout
+  if (filters.value.maxDistanceNm) params.maxDistanceNm = filters.value.maxDistanceNm
+  if (filters.value.departureIcao) params.departureIcao = filters.value.departureIcao.toUpperCase()
+  if (filters.value.arrivalIcao) params.arrivalIcao = filters.value.arrivalIcao.toUpperCase()
+
+  // Apply vicinity search if airport selected
+  if (selectedAirport.value) {
+    params.centerLatitude = selectedAirport.value.latitude
+    params.centerLongitude = selectedAirport.value.longitude
+    params.vicinityRadiusNm = vicinityRadius.value
+  }
+
+  const response = await api.jobs.search(params)
+
+  if (response.data) {
+    jobs.value = response.data.jobs
+    searchResult.value = response.data
+  }
+
+  loading.value = false
+}
+
+// Sorting
+function sortBy(column: string) {
+  if (currentSort.value === column) {
+    sortDesc.value = !sortDesc.value
+  } else {
+    currentSort.value = column
+    sortDesc.value = true
+  }
+  loadJobs()
+}
+
+// Pagination
+function goToPage(page: number) {
+  currentPage.value = page
+  loadJobs()
+}
+
+function onPageSizeChange() {
+  currentPage.value = 1
+  jobsConfig.setPageSize(pageSize.value)
+  loadJobs()
+}
+
+function onVicinityChange() {
+  jobsConfig.setVicinityRadius(vicinityRadius.value)
+  loadJobs()
+}
+
+// Filters
+function resetFilters() {
+  filters.value = {
+    jobType: undefined,
+    urgency: undefined,
+    minPayout: undefined,
+    maxDistanceNm: undefined,
+    departureIcao: '',
+    arrivalIcao: '',
+  }
+  currentPage.value = 1
+  loadJobs()
+}
+
+// Accept job
 async function acceptJob(job: Job) {
   if (!userStore.user.value?.id) return
 
@@ -354,322 +603,106 @@ async function acceptJob(job: Job) {
     if (selectedJob.value?.id === job.id) {
       selectedJob.value = null
     }
+    if (searchResult.value) {
+      searchResult.value.totalCount--
+    }
   }
   acceptingJobId.value = null
 }
 
-watch([selectedCargoType, selectedUrgency], () => {
+// Formatting helpers
+function formatWeight(weight: number): string {
+  if (weight >= 1000) {
+    return `${(weight / 1000).toFixed(1)}k lbs`
+  }
+  return `${weight} lbs`
+}
+
+function formatExpiry(expiresAt: string): string {
+  const now = new Date()
+  const expiry = new Date(expiresAt)
+  const diff = expiry.getTime() - now.getTime()
+
+  if (diff <= 0) return 'Expired'
+
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+
+  if (hours > 24) {
+    const days = Math.floor(hours / 24)
+    return `${days}d ${hours % 24}h`
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  }
+  return `${minutes}m`
+}
+
+function isHighPayout(job: Job): boolean {
+  return job.payout >= 10000 || (job.urgency !== undefined && job.urgency !== 'Standard')
+}
+
+function getUrgencyRowClass(urgency?: string): string {
+  if (!urgency || urgency === 'Standard') return 'urgency-row-standard'
+  if (typeof urgency !== 'string') return 'urgency-row-standard'
+  return `urgency-row-${urgency.toLowerCase()}`
+}
+
+// Settings
+function saveConfig() {
+  jobsConfig.updateConfig(jobsConfig.config.value)
+}
+
+function resetSettings() {
+  jobsConfig.resetConfig()
+  vicinityRadius.value = jobsConfig.config.value.vicinityRadiusNm
+  pageSize.value = jobsConfig.config.value.pageSize
+}
+
+// Init
+onMounted(async () => {
+  // Center on current airport if available
+  if (worldStore.currentPlayerWorld.value?.currentAirportId) {
+    const airport = await api.airports.get(worldStore.currentPlayerWorld.value.currentAirportId)
+    if (airport.data) {
+      mapCenter.value = [airport.data.latitude, airport.data.longitude]
+      zoom.value = 7
+    }
+  }
+
+  // Load jobs (airports will be loaded when map is ready via @ready event)
   loadJobs()
 })
 
-onMounted(() => {
-  if (currentAirport.value) {
-    mapCenter.value = [currentAirport.value.latitude, currentAirport.value.longitude]
-    zoom.value = 6
-  }
+// Watch for world changes
+watch(() => worldStore.currentPlayerWorld.value?.worldId, () => {
   loadJobs()
+})
+
+// Cleanup before unmount to prevent Leaflet errors
+onBeforeUnmount(() => {
+  isUnmounting.value = true
+  mapReady.value = false
+  visibleAirports.value = []
+  selectedAirport.value = null
+  selectedJob.value = null
 })
 </script>
 
 <style scoped>
-.jobs-layout {
+.jobs-view {
   display: flex;
+  flex-direction: column;
   height: 100%;
   background: var(--bg-primary);
-}
-
-.jobs-list-panel {
-  width: 420px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-header {
-  padding: 24px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.panel-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.panel-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.filters {
-  display: flex;
-  gap: 12px;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.filter-select {
-  flex: 1;
-}
-
-.loading-state,
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 48px 24px;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  width: 48px;
-  height: 48px;
-  color: var(--text-muted);
-}
-
-.jobs-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.job-card {
-  background: var(--bg-elevated);
-  border: 2px solid transparent;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.job-card:hover {
-  border-color: var(--border-subtle);
-}
-
-.job-card.selected {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 4px var(--accent-glow);
-}
-
-.job-card.urgency-priority {
-  border-left: 3px solid #3b82f6;
-}
-
-.job-card.urgency-express {
-  border-left: 3px solid #eab308;
-}
-
-.job-card.urgency-urgent {
-  border-left: 3px solid #f97316;
-}
-
-.job-card.urgency-critical {
-  border-left: 3px solid #ef4444;
-  background: rgba(239, 68, 68, 0.05);
-}
-
-.job-header {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.job-type-badge {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.job-type-cargo {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
-}
-
-.job-type-passenger {
-  background: rgba(168, 85, 247, 0.2);
-  color: #a855f7;
-}
-
-.urgency-badge {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.urgency-badge-priority {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
-}
-
-.urgency-badge-express {
-  background: rgba(234, 179, 8, 0.2);
-  color: #eab308;
-}
-
-.urgency-badge-urgent {
-  background: rgba(249, 115, 22, 0.2);
-  color: #f97316;
-}
-
-.urgency-badge-critical {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.job-route {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.airport-code {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.route-line {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 80px;
-}
-
-.route-line svg {
-  width: 24px;
-  height: 24px;
-  color: var(--accent-primary);
-}
-
-.job-details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 16px;
-  margin-bottom: 16px;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.detail-label {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.detail-value {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.cargo-badge {
-  background: var(--accent-primary);
-  color: white;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-}
-
-.job-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.payout-label {
-  display: block;
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-}
-
-.payout-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #22c55e;
-}
-
-.payout-value.high-payout {
-  color: #f59e0b;
-}
-
-.distance-category {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-left: 4px;
-}
-
-.passenger-class {
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-}
-
-.class-economy {
-  background: rgba(156, 163, 175, 0.2);
-  color: #9ca3af;
-}
-
-.class-business {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
-}
-
-.class-premium {
-  background: rgba(234, 179, 8, 0.2);
-  color: #eab308;
-}
-
-.risk-level {
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-}
-
-.risk-low {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22c55e;
-}
-
-.risk-medium {
-  background: rgba(234, 179, 8, 0.2);
-  color: #eab308;
-}
-
-.risk-high {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-}
-
-.accept-btn {
-  text-transform: none;
-}
-
-.map-panel {
-  flex: 1;
   position: relative;
+}
+
+/* Map Section */
+.map-section {
+  position: relative;
+  min-height: 200px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .leaflet-map {
@@ -677,35 +710,520 @@ onMounted(() => {
   width: 100%;
 }
 
-.map-info-panel {
+.map-controls {
   position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.map-controls > * {
+  pointer-events: auto;
+}
+
+.selected-info {
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 16px 24px;
+  border-radius: 8px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  z-index: 1000;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  gap: 8px;
 }
 
-.map-info-panel h3 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+.selected-info .airport-code {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.selected-info .airport-label {
+  color: var(--text-secondary);
+  font-size: 13px;
   max-width: 200px;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.route-arrow {
+.clear-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+}
+
+.clear-btn:hover {
+  color: var(--text-primary);
+}
+
+.clear-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.map-stats {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 6px 12px;
   font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.map-stats .divider {
+  margin: 0 8px;
+  color: var(--border-subtle);
+}
+
+.airport-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.airport-popup .airport-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.airport-popup .airport-type {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+/* Filters Bar */
+.filters-bar {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 12px 16px;
+}
+
+.filters-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
+
+.filter-group select,
+.filter-group input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 100px;
+}
+
+.filter-group input[type="number"] {
+  width: 80px;
+}
+
+.filter-group input[type="text"] {
+  width: 70px;
+  text-transform: uppercase;
+}
+
+.vicinity-group input {
+  width: 70px;
+}
+
+.reset-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Jobs Table */
+.jobs-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.jobs-table-container {
+  flex: 1;
+  overflow: auto;
+}
+
+.jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.jobs-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.jobs-table th.sortable {
+  cursor: pointer;
+}
+
+.jobs-table th.sortable:hover {
+  color: var(--text-primary);
+}
+
+.sort-icon {
+  margin-left: 4px;
+  color: var(--accent-primary);
+}
+
+.jobs-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.jobs-table tr {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.jobs-table tbody tr:hover {
+  background: var(--bg-elevated);
+}
+
+.jobs-table tr.selected {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.jobs-table tr.urgency-row-priority {
+  border-left: 3px solid #3b82f6;
+}
+
+.jobs-table tr.urgency-row-express {
+  border-left: 3px solid #eab308;
+}
+
+.jobs-table tr.urgency-row-urgent {
+  border-left: 3px solid #f97316;
+}
+
+.jobs-table tr.urgency-row-critical {
+  border-left: 3px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.loading-cell,
+.empty-cell {
+  text-align: center;
+  padding: 40px !important;
+  color: var(--text-secondary);
+}
+
+.loading-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Route cell */
+.route-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+}
+
+.route-cell .icao {
+  font-weight: 600;
+}
+
+.route-cell .arrow {
+  color: var(--text-muted);
+}
+
+/* Badges */
+.type-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.type-badge.cargo {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.type-badge.passenger {
+  background: rgba(168, 85, 247, 0.2);
+  color: #a855f7;
+}
+
+.urgency-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.urgency-badge.standard {
+  background: rgba(107, 114, 128, 0.2);
+  color: #6b7280;
+}
+
+.urgency-badge.priority {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.urgency-badge.express {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+.urgency-badge.urgent {
+  background: rgba(249, 115, 22, 0.2);
+  color: #f97316;
+}
+
+.urgency-badge.critical {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.cargo-name {
+  font-size: 12px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payout {
+  font-weight: 600;
+  color: #22c55e;
+}
+
+.payout.high {
+  color: #f59e0b;
+}
+
+.accept-btn {
+  background: var(--accent-primary);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.accept-btn:hover {
+  opacity: 0.9;
+}
+
+.accept-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Pagination */
+.pagination-bar {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-controls button {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.pagination-controls button:hover:not(:disabled) {
+  background: var(--bg-elevated);
+}
+
+.pagination-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 0 8px;
+}
+
+.page-size-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-left: 8px;
+}
+
+/* Settings Panel */
+.settings-panel {
+  position: absolute;
+  bottom: 60px;
+  right: 16px;
+  z-index: 100;
+}
+
+.settings-toggle {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.settings-toggle:hover {
+  background: var(--bg-elevated);
+}
+
+.settings-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.settings-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+  min-width: 250px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.setting-row:last-child {
+  margin-bottom: 0;
+}
+
+.setting-row label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.setting-row input[type="range"] {
+  flex: 1;
+  max-width: 100px;
+}
+
+.setting-row input[type="number"] {
+  width: 70px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.setting-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.reset-settings-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.reset-settings-btn:hover {
+  background: var(--bg-elevated);
+}
+
+/* Column widths */
+.col-route { width: 120px; }
+.col-type { width: 80px; }
+.col-urgency { width: 90px; }
+.col-cargo { width: 130px; }
+.col-weight { width: 80px; }
+.col-distance { width: 80px; }
+.col-payout { width: 100px; }
+.col-expiry { width: 80px; }
+.col-actions { width: 70px; }
 </style>

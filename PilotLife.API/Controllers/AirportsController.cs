@@ -157,6 +157,121 @@ public class AirportsController : ControllerBase
             Municipality = airport.Municipality
         });
     }
+
+    /// <summary>
+    /// Gets airports within map bounds with zoom-based filtering.
+    /// At low zoom levels, only large airports are shown. At higher zoom levels, more airports are included.
+    /// </summary>
+    [HttpGet("in-bounds")]
+    public async Task<ActionResult<List<AirportDto>>> GetAirportsInBounds(
+        [FromQuery] double north,
+        [FromQuery] double south,
+        [FromQuery] double east,
+        [FromQuery] double west,
+        [FromQuery] int zoomLevel = 5,
+        [FromQuery] int limit = 500)
+    {
+        var query = _context.Airports
+            .Where(a =>
+                a.Latitude >= south &&
+                a.Latitude <= north &&
+                a.Longitude >= west &&
+                a.Longitude <= east);
+
+        // Filter by airport type based on zoom level
+        // Zoom 0-4: Only large airports
+        // Zoom 5-7: Large and medium airports
+        // Zoom 8+: All airports (large, medium, small)
+        if (zoomLevel <= 4)
+        {
+            query = query.Where(a => a.Type == "large_airport");
+        }
+        else if (zoomLevel <= 7)
+        {
+            query = query.Where(a => a.Type == "large_airport" || a.Type == "medium_airport");
+        }
+        else
+        {
+            query = query.Where(a => a.Type == "large_airport" || a.Type == "medium_airport" || a.Type == "small_airport");
+        }
+
+        var airports = await query
+            .OrderByDescending(a => a.Type == "large_airport")
+            .ThenByDescending(a => a.Type == "medium_airport")
+            .Take(limit)
+            .Select(a => new AirportDto
+            {
+                Id = a.Id,
+                Ident = a.Ident,
+                Name = a.Name,
+                IataCode = a.IataCode,
+                Type = a.Type,
+                Latitude = a.Latitude,
+                Longitude = a.Longitude,
+                ElevationFt = a.ElevationFt,
+                Country = a.Country,
+                Municipality = a.Municipality
+            })
+            .ToListAsync();
+
+        return Ok(airports);
+    }
+
+    /// <summary>
+    /// Gets airports within a radius of a center point.
+    /// </summary>
+    [HttpGet("nearby")]
+    public async Task<ActionResult<List<AirportDto>>> GetNearbyAirports(
+        [FromQuery] double latitude,
+        [FromQuery] double longitude,
+        [FromQuery] double radiusNm = 100,
+        [FromQuery] string? types = null,
+        [FromQuery] int limit = 100)
+    {
+        // Use bounding box for initial filter (1 degree lat ≈ 60nm)
+        var latDegreeRange = radiusNm / 60.0;
+        var lonDegreeRange = radiusNm / (60.0 * Math.Cos(latitude * Math.PI / 180));
+
+        var query = _context.Airports
+            .Where(a =>
+                a.Latitude >= latitude - latDegreeRange &&
+                a.Latitude <= latitude + latDegreeRange &&
+                a.Longitude >= longitude - lonDegreeRange &&
+                a.Longitude <= longitude + lonDegreeRange);
+
+        // Filter by types if specified (comma-separated)
+        if (!string.IsNullOrWhiteSpace(types))
+        {
+            var typeList = types.Split(',').Select(t => t.Trim()).ToList();
+            query = query.Where(a => typeList.Contains(a.Type));
+        }
+        else
+        {
+            // Default to major airport types
+            query = query.Where(a => a.Type == "large_airport" || a.Type == "medium_airport" || a.Type == "small_airport");
+        }
+
+        var airports = await query
+            .OrderByDescending(a => a.Type == "large_airport")
+            .ThenByDescending(a => a.Type == "medium_airport")
+            .Take(limit)
+            .Select(a => new AirportDto
+            {
+                Id = a.Id,
+                Ident = a.Ident,
+                Name = a.Name,
+                IataCode = a.IataCode,
+                Type = a.Type,
+                Latitude = a.Latitude,
+                Longitude = a.Longitude,
+                ElevationFt = a.ElevationFt,
+                Country = a.Country,
+                Municipality = a.Municipality
+            })
+            .ToListAsync();
+
+        return Ok(airports);
+    }
 }
 
 public record AirportDto

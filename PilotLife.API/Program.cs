@@ -4,10 +4,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PilotLife.API.Services;
 using PilotLife.API.Services.Jobs;
+using PilotLife.API.Services.Licenses;
+using PilotLife.API.Services.Maintenance;
+using PilotLife.API.Services.Reputation;
+using PilotLife.API.Services.Skills;
 using PilotLife.Application.Authorization;
 using PilotLife.Application.FlightTracking;
 using PilotLife.Application.Jobs;
+using PilotLife.Application.Maintenance;
 using PilotLife.Application.Marketplace;
+using PilotLife.Application.Reputation;
+using PilotLife.Application.Skills;
 using PilotLife.Database.Data;
 using Scalar.AspNetCore;
 
@@ -88,6 +95,26 @@ builder.Services.Configure<JobGenerationConfiguration>(
     builder.Configuration.GetSection(JobGenerationConfiguration.SectionName));
 builder.Services.AddScoped<IJobGenerator, JobGenerationService>();
 builder.Services.AddHostedService<JobGenerationBackgroundService>();
+
+// Maintenance services
+builder.Services.Configure<MaintenanceConfiguration>(
+    builder.Configuration.GetSection(MaintenanceConfiguration.SectionName));
+builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+builder.Services.AddHostedService<MaintenanceCompletionService>();
+
+// License services
+builder.Services.AddScoped<LicenseService>();
+builder.Services.AddScoped<ExamService>();
+
+// Reputation services
+builder.Services.Configure<ReputationConfiguration>(
+    builder.Configuration.GetSection(ReputationConfiguration.SectionName));
+builder.Services.AddScoped<IReputationService, ReputationService>();
+
+// Skills services
+builder.Services.Configure<SkillsConfiguration>(
+    builder.Configuration.GetSection(SkillsConfiguration.SectionName));
+builder.Services.AddScoped<ISkillsService, SkillsService>();
 
 var app = builder.Build();
 

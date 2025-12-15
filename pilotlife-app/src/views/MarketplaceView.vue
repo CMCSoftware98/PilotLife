@@ -399,7 +399,7 @@ function getConditionClass(condition: number): string {
   return 'condition-poor'
 }
 
-function getDistanceToAircraft(item: DealerInventoryResponse): string | null {
+function getDistanceToAircraft(_item: DealerInventoryResponse): string | null {
   // TODO: Calculate actual distance from current location
   return null
 }

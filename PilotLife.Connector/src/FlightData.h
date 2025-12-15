@@ -24,7 +24,8 @@ enum DATA_REQUEST_ID {
     REQUEST_FLIGHT_DATA = 0
 };
 
-// Structure must match the order of AddToDataDefinition calls
+// Structure must match the order of AddToDataDefinition calls EXACTLY
+// SimConnect returns all numeric values as FLOAT64 (double) when units are specified
 // Uses #pragma pack to ensure proper memory alignment with SimConnect
 #pragma pack(push, 1)
 struct SimConnectFlightData {
@@ -35,8 +36,8 @@ struct SimConnectFlightData {
     char atcAirline[64];          // ATC AIRLINE (airline name)
     char atcFlightNumber[64];     // ATC FLIGHT NUMBER
     char category[256];           // CATEGORY (e.g., "Airplane", "Helicopter")
-    int engineType;               // ENGINE TYPE (0=Piston, 1=Jet, 2=None, 3=Helo, 4=Rocket, 5=Turboprop)
-    int numberOfEngines;          // NUMBER OF ENGINES
+    double engineType;            // ENGINE TYPE (0=Piston, 1=Jet, 2=None, 3=Helo, 4=Rocket, 5=Turboprop) - FLOAT64
+    double numberOfEngines;       // NUMBER OF ENGINES - FLOAT64
     double maxGrossWeight;        // MAX GROSS WEIGHT (pounds)
     double cruiseSpeed;           // DESIGN CRUISE ALT (knots)
     double latitude;              // PLANE LATITUDE (degrees)
@@ -55,10 +56,10 @@ struct SimConnectFlightData {
     double fuelWeightPerGallon;   // FUEL WEIGHT PER GALLON (pounds)
     double totalWeight;           // TOTAL WEIGHT (pounds)
     double emptyWeight;           // EMPTY WEIGHT (pounds)
-    int com1ActiveFreq;           // COM ACTIVE FREQUENCY:1 (Hz)
-    int com2ActiveFreq;           // COM ACTIVE FREQUENCY:2 (Hz)
-    int nav1ActiveFreq;           // NAV ACTIVE FREQUENCY:1 (Hz)
-    int nav2ActiveFreq;           // NAV ACTIVE FREQUENCY:2 (Hz)
+    double com1ActiveFreq;        // COM ACTIVE FREQUENCY:1 (Hz) - FLOAT64
+    double com2ActiveFreq;        // COM ACTIVE FREQUENCY:2 (Hz) - FLOAT64
+    double nav1ActiveFreq;        // NAV ACTIVE FREQUENCY:1 (Hz) - FLOAT64
+    double nav2ActiveFreq;        // NAV ACTIVE FREQUENCY:2 (Hz) - FLOAT64
 };
 #pragma pack(pop)
 
@@ -123,7 +124,7 @@ struct FlightDataJson {
 
 private:
     // Helper to format frequency from Hz to MHz string (e.g., 118700000 -> "118.700")
-    static std::string formatFrequency(int freqHz);
+    static std::string formatFrequency(double freqHz);
 
     // Helper to get current UTC timestamp in ISO 8601 format
     static std::string getCurrentTimestamp();

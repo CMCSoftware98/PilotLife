@@ -45,6 +45,26 @@ public class PilotLifeDbContext : DbContext
     // Cargo entities
     public DbSet<CargoType> CargoTypes => Set<CargoType>();
 
+    // License entities
+    public DbSet<LicenseType> LicenseTypes => Set<LicenseType>();
+    public DbSet<UserLicense> UserLicenses => Set<UserLicense>();
+    public DbSet<LicenseExam> LicenseExams => Set<LicenseExam>();
+    public DbSet<ExamManeuver> ExamManeuvers => Set<ExamManeuver>();
+    public DbSet<ExamCheckpoint> ExamCheckpoints => Set<ExamCheckpoint>();
+    public DbSet<ExamLanding> ExamLandings => Set<ExamLanding>();
+    public DbSet<ExamViolation> ExamViolations => Set<ExamViolation>();
+
+    // Banking entities
+    public DbSet<Bank> Banks => Set<Bank>();
+    public DbSet<Loan> Loans => Set<Loan>();
+    public DbSet<LoanPayment> LoanPayments => Set<LoanPayment>();
+    public DbSet<CreditScoreEvent> CreditScoreEvents => Set<CreditScoreEvent>();
+
+    // Reputation and skills entities
+    public DbSet<ReputationEvent> ReputationEvents => Set<ReputationEvent>();
+    public DbSet<PlayerSkill> PlayerSkills => Set<PlayerSkill>();
+    public DbSet<SkillXpEvent> SkillXpEvents => Set<SkillXpEvent>();
+
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         UpdateTimestamps();
@@ -96,6 +116,20 @@ public class PilotLifeDbContext : DbContext
         ConfigureBaseEntity<DealerInventory>(modelBuilder);
         ConfigureBaseEntity<AircraftPurchase>(modelBuilder);
         ConfigureBaseEntity<CargoType>(modelBuilder);
+        ConfigureBaseEntity<LicenseType>(modelBuilder);
+        ConfigureBaseEntity<UserLicense>(modelBuilder);
+        ConfigureBaseEntity<LicenseExam>(modelBuilder);
+        ConfigureBaseEntity<ExamManeuver>(modelBuilder);
+        ConfigureBaseEntity<ExamCheckpoint>(modelBuilder);
+        ConfigureBaseEntity<ExamLanding>(modelBuilder);
+        ConfigureBaseEntity<ExamViolation>(modelBuilder);
+        ConfigureBaseEntity<Bank>(modelBuilder);
+        ConfigureBaseEntity<Loan>(modelBuilder);
+        ConfigureBaseEntity<LoanPayment>(modelBuilder);
+        ConfigureBaseEntity<CreditScoreEvent>(modelBuilder);
+        ConfigureBaseEntity<ReputationEvent>(modelBuilder);
+        ConfigureBaseEntity<PlayerSkill>(modelBuilder);
+        ConfigureBaseEntity<SkillXpEvent>(modelBuilder);
 
         ConfigureUser(modelBuilder);
         ConfigureAirport(modelBuilder);
@@ -120,6 +154,20 @@ public class PilotLifeDbContext : DbContext
         ConfigureDealerInventory(modelBuilder);
         ConfigureAircraftPurchase(modelBuilder);
         ConfigureCargoType(modelBuilder);
+        ConfigureLicenseType(modelBuilder);
+        ConfigureUserLicense(modelBuilder);
+        ConfigureLicenseExam(modelBuilder);
+        ConfigureExamManeuver(modelBuilder);
+        ConfigureExamCheckpoint(modelBuilder);
+        ConfigureExamLanding(modelBuilder);
+        ConfigureExamViolation(modelBuilder);
+        ConfigureBank(modelBuilder);
+        ConfigureLoan(modelBuilder);
+        ConfigureLoanPayment(modelBuilder);
+        ConfigureCreditScoreEvent(modelBuilder);
+        ConfigureReputationEvent(modelBuilder);
+        ConfigurePlayerSkill(modelBuilder);
+        ConfigureSkillXpEvent(modelBuilder);
     }
 
     private static void ConfigureBaseEntity<T>(ModelBuilder modelBuilder) where T : BaseEntity
@@ -2323,6 +2371,1100 @@ public class PilotLifeDbContext : DbContext
             entity.HasIndex(e => e.Subcategory);
             entity.HasIndex(e => new { e.Category, e.Subcategory });
             entity.HasIndex(e => e.IsActive);
+        });
+    }
+
+    private static void ConfigureLicenseType(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<LicenseType>(entity =>
+        {
+            entity.ToTable("license_types");
+
+            entity.Property(e => e.Code)
+                .HasColumnName("code")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.HasIndex(e => e.Code).IsUnique();
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.Category)
+                .HasColumnName("category")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.BaseExamCost)
+                .HasColumnName("base_exam_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.ExamDurationMinutes)
+                .HasColumnName("exam_duration_minutes");
+
+            entity.Property(e => e.PassingScore)
+                .HasColumnName("passing_score")
+                .HasDefaultValue(70);
+
+            entity.Property(e => e.RequiredAircraftCategory)
+                .HasColumnName("required_aircraft_category")
+                .HasConversion<string>()
+                .HasMaxLength(30);
+
+            entity.Property(e => e.RequiredAircraftType)
+                .HasColumnName("required_aircraft_type")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.ValidityGameDays)
+                .HasColumnName("validity_game_days");
+
+            entity.Property(e => e.BaseRenewalCost)
+                .HasColumnName("base_renewal_cost")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.PrerequisiteLicensesJson)
+                .HasColumnName("prerequisite_licenses_json")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.DisplayOrder)
+                .HasColumnName("display_order")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.IsActive)
+                .HasColumnName("is_active")
+                .HasDefaultValue(true);
+
+            // Indexes
+            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => e.DisplayOrder);
+        });
+    }
+
+    private static void ConfigureUserLicense(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserLicense>(entity =>
+        {
+            entity.ToTable("user_licenses");
+
+            entity.Property(e => e.PlayerWorldId)
+                .HasColumnName("player_world_id")
+                .IsRequired();
+
+            entity.Property(e => e.LicenseTypeId)
+                .HasColumnName("license_type_id")
+                .IsRequired();
+
+            entity.Property(e => e.EarnedAt)
+                .HasColumnName("earned_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.ExpiresAt)
+                .HasColumnName("expires_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.LastRenewedAt)
+                .HasColumnName("last_renewed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.RenewalCount)
+                .HasColumnName("renewal_count")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.IsValid)
+                .HasColumnName("is_valid")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.IsRevoked)
+                .HasColumnName("is_revoked")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.RevocationReason)
+                .HasColumnName("revocation_reason")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.RevokedAt)
+                .HasColumnName("revoked_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.ExamScore)
+                .HasColumnName("exam_score");
+
+            entity.Property(e => e.ExamAttempts)
+                .HasColumnName("exam_attempts")
+                .HasDefaultValue(1);
+
+            entity.Property(e => e.TotalPaid)
+                .HasColumnName("total_paid")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.PassedExamId)
+                .HasColumnName("passed_exam_id");
+
+            // Relationships
+            entity.HasOne(e => e.PlayerWorld)
+                .WithMany()
+                .HasForeignKey(e => e.PlayerWorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.LicenseType)
+                .WithMany(lt => lt.UserLicenses)
+                .HasForeignKey(e => e.LicenseTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.PassedExam)
+                .WithOne(le => le.EarnedLicense)
+                .HasForeignKey<UserLicense>(e => e.PassedExamId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.PlayerWorldId);
+            entity.HasIndex(e => e.LicenseTypeId);
+            entity.HasIndex(e => e.IsValid);
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.HasIndex(e => new { e.PlayerWorldId, e.LicenseTypeId }).IsUnique();
+        });
+    }
+
+    private static void ConfigureLicenseExam(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<LicenseExam>(entity =>
+        {
+            entity.ToTable("license_exams");
+
+            entity.Property(e => e.PlayerWorldId)
+                .HasColumnName("player_world_id")
+                .IsRequired();
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.LicenseTypeId)
+                .HasColumnName("license_type_id")
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(e => e.ScheduledAt)
+                .HasColumnName("scheduled_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.StartedAt)
+                .HasColumnName("started_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.TimeLimitMinutes)
+                .HasColumnName("time_limit_minutes");
+
+            entity.Property(e => e.RequiredAircraftCategory)
+                .HasColumnName("required_aircraft_category")
+                .HasConversion<string>()
+                .HasMaxLength(30);
+
+            entity.Property(e => e.RequiredAircraftType)
+                .HasColumnName("required_aircraft_type")
+                .HasMaxLength(50);
+
+            entity.Property(e => e.DepartureIcao)
+                .HasColumnName("departure_icao")
+                .HasMaxLength(10)
+                .IsRequired();
+
+            entity.Property(e => e.RouteJson)
+                .HasColumnName("route_json")
+                .HasMaxLength(4000);
+
+            entity.Property(e => e.AssignedAltitudeFt)
+                .HasColumnName("assigned_altitude_ft");
+
+            entity.Property(e => e.Score)
+                .HasColumnName("score")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.PassingScore)
+                .HasColumnName("passing_score")
+                .HasDefaultValue(70);
+
+            entity.Property(e => e.FailureReason)
+                .HasColumnName("failure_reason")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.ExaminerNotes)
+                .HasColumnName("examiner_notes")
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.AttemptNumber)
+                .HasColumnName("attempt_number")
+                .HasDefaultValue(1);
+
+            entity.Property(e => e.FeePaid)
+                .HasColumnName("fee_paid")
+                .HasPrecision(18, 2);
+
+            entity.Property(e => e.EligibleForRetakeAt)
+                .HasColumnName("eligible_for_retake_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.FlightTimeMinutes)
+                .HasColumnName("flight_time_minutes");
+
+            entity.Property(e => e.DistanceFlownNm)
+                .HasColumnName("distance_flown_nm");
+
+            entity.Property(e => e.AircraftUsed)
+                .HasColumnName("aircraft_used")
+                .HasMaxLength(50);
+
+            // Relationships
+            entity.HasOne(e => e.PlayerWorld)
+                .WithMany()
+                .HasForeignKey(e => e.PlayerWorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.LicenseType)
+                .WithMany(lt => lt.Exams)
+                .HasForeignKey(e => e.LicenseTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Indexes
+            entity.HasIndex(e => e.PlayerWorldId);
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.LicenseTypeId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => new { e.PlayerWorldId, e.Status });
+            entity.HasIndex(e => new { e.PlayerWorldId, e.LicenseTypeId, e.Status });
+        });
+    }
+
+    private static void ConfigureExamManeuver(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ExamManeuver>(entity =>
+        {
+            entity.ToTable("exam_maneuvers");
+
+            entity.Property(e => e.ExamId)
+                .HasColumnName("exam_id")
+                .IsRequired();
+
+            entity.Property(e => e.ManeuverType)
+                .HasColumnName("maneuver_type")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.Order)
+                .HasColumnName("order");
+
+            entity.Property(e => e.IsRequired)
+                .HasColumnName("is_required")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.MaxPoints)
+                .HasColumnName("max_points");
+
+            entity.Property(e => e.PointsAwarded)
+                .HasColumnName("points_awarded")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.Result)
+                .HasColumnName("result")
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(ManeuverResult.NotAttempted);
+
+            entity.Property(e => e.AltitudeToleranceFt)
+                .HasColumnName("altitude_tolerance_ft");
+
+            entity.Property(e => e.HeadingToleranceDeg)
+                .HasColumnName("heading_tolerance_deg");
+
+            entity.Property(e => e.SpeedToleranceKts)
+                .HasColumnName("speed_tolerance_kts");
+
+            entity.Property(e => e.AltitudeDeviationFt)
+                .HasColumnName("altitude_deviation_ft");
+
+            entity.Property(e => e.HeadingDeviationDeg)
+                .HasColumnName("heading_deviation_deg");
+
+            entity.Property(e => e.SpeedDeviationKts)
+                .HasColumnName("speed_deviation_kts");
+
+            entity.Property(e => e.StartedAt)
+                .HasColumnName("started_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(500);
+
+            // Relationships
+            entity.HasOne(e => e.Exam)
+                .WithMany(ex => ex.Maneuvers)
+                .HasForeignKey(e => e.ExamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.ExamId);
+            entity.HasIndex(e => new { e.ExamId, e.Order });
+        });
+    }
+
+    private static void ConfigureExamCheckpoint(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ExamCheckpoint>(entity =>
+        {
+            entity.ToTable("exam_checkpoints");
+
+            entity.Property(e => e.ExamId)
+                .HasColumnName("exam_id")
+                .IsRequired();
+
+            entity.Property(e => e.Order)
+                .HasColumnName("order");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.Latitude)
+                .HasColumnName("latitude");
+
+            entity.Property(e => e.Longitude)
+                .HasColumnName("longitude");
+
+            entity.Property(e => e.RequiredAltitudeFt)
+                .HasColumnName("required_altitude_ft");
+
+            entity.Property(e => e.RadiusNm)
+                .HasColumnName("radius_nm")
+                .HasDefaultValue(1.0);
+
+            entity.Property(e => e.WasReached)
+                .HasColumnName("was_reached")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.ReachedAt)
+                .HasColumnName("reached_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.AltitudeAtReach)
+                .HasColumnName("altitude_at_reach");
+
+            entity.Property(e => e.SpeedAtReachKts)
+                .HasColumnName("speed_at_reach_kts");
+
+            entity.Property(e => e.PointsAwarded)
+                .HasColumnName("points_awarded")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.MaxPoints)
+                .HasColumnName("max_points");
+
+            // Relationships
+            entity.HasOne(e => e.Exam)
+                .WithMany(ex => ex.Checkpoints)
+                .HasForeignKey(e => e.ExamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.ExamId);
+            entity.HasIndex(e => new { e.ExamId, e.Order });
+        });
+    }
+
+    private static void ConfigureExamLanding(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ExamLanding>(entity =>
+        {
+            entity.ToTable("exam_landings");
+
+            entity.Property(e => e.ExamId)
+                .HasColumnName("exam_id")
+                .IsRequired();
+
+            entity.Property(e => e.Order)
+                .HasColumnName("order");
+
+            entity.Property(e => e.AirportIcao)
+                .HasColumnName("airport_icao")
+                .HasMaxLength(10)
+                .IsRequired();
+
+            entity.Property(e => e.Type)
+                .HasColumnName("type")
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(e => e.VerticalSpeedFpm)
+                .HasColumnName("vertical_speed_fpm");
+
+            entity.Property(e => e.CenterlineDeviationFt)
+                .HasColumnName("centerline_deviation_ft");
+
+            entity.Property(e => e.TouchdownZoneDistanceFt)
+                .HasColumnName("touchdown_zone_distance_ft");
+
+            entity.Property(e => e.GroundSpeedKts)
+                .HasColumnName("ground_speed_kts");
+
+            entity.Property(e => e.PitchDeg)
+                .HasColumnName("pitch_deg");
+
+            entity.Property(e => e.BankDeg)
+                .HasColumnName("bank_deg");
+
+            entity.Property(e => e.GearDown)
+                .HasColumnName("gear_down")
+                .HasDefaultValue(true);
+
+            entity.Property(e => e.RunwayUsed)
+                .HasColumnName("runway_used")
+                .HasMaxLength(10);
+
+            entity.Property(e => e.PointsAwarded)
+                .HasColumnName("points_awarded")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.MaxPoints)
+                .HasColumnName("max_points");
+
+            entity.Property(e => e.LandedAt)
+                .HasColumnName("landed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(500);
+
+            // Relationships
+            entity.HasOne(e => e.Exam)
+                .WithMany(ex => ex.Landings)
+                .HasForeignKey(e => e.ExamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.ExamId);
+            entity.HasIndex(e => new { e.ExamId, e.Order });
+        });
+    }
+
+    private static void ConfigureExamViolation(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ExamViolation>(entity =>
+        {
+            entity.ToTable("exam_violations");
+
+            entity.Property(e => e.ExamId)
+                .HasColumnName("exam_id")
+                .IsRequired();
+
+            entity.Property(e => e.OccurredAt)
+                .HasColumnName("occurred_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.Type)
+                .HasColumnName("type")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.Value)
+                .HasColumnName("value");
+
+            entity.Property(e => e.Threshold)
+                .HasColumnName("threshold");
+
+            entity.Property(e => e.PointsDeducted)
+                .HasColumnName("points_deducted");
+
+            entity.Property(e => e.CausedFailure)
+                .HasColumnName("caused_failure")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.LatitudeAtViolation)
+                .HasColumnName("latitude_at_violation");
+
+            entity.Property(e => e.LongitudeAtViolation)
+                .HasColumnName("longitude_at_violation");
+
+            entity.Property(e => e.AltitudeAtViolation)
+                .HasColumnName("altitude_at_violation");
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(500);
+
+            // Relationships
+            entity.HasOne(e => e.Exam)
+                .WithMany(ex => ex.Violations)
+                .HasForeignKey(e => e.ExamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.ExamId);
+            entity.HasIndex(e => e.Type);
+            entity.HasIndex(e => new { e.ExamId, e.OccurredAt });
+        });
+    }
+
+    private static void ConfigureBank(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Bank>(entity =>
+        {
+            entity.ToTable("banks");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.OffersStarterLoan)
+                .HasColumnName("offers_starter_loan")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.StarterLoanMaxAmount)
+                .HasColumnName("starter_loan_max_amount")
+                .HasPrecision(18, 2)
+                .HasDefaultValue(250000m);
+
+            entity.Property(e => e.StarterLoanInterestRate)
+                .HasColumnName("starter_loan_interest_rate")
+                .HasPrecision(8, 6)
+                .HasDefaultValue(0.015m);
+
+            entity.Property(e => e.BaseInterestRate)
+                .HasColumnName("base_interest_rate")
+                .HasPrecision(8, 6)
+                .HasDefaultValue(0.02m);
+
+            entity.Property(e => e.MaxInterestRate)
+                .HasColumnName("max_interest_rate")
+                .HasPrecision(8, 6)
+                .HasDefaultValue(0.08m);
+
+            entity.Property(e => e.MinCreditScore)
+                .HasColumnName("min_credit_score")
+                .HasDefaultValue(500);
+
+            entity.Property(e => e.MaxLoanToNetWorthRatio)
+                .HasColumnName("max_loan_to_net_worth_ratio")
+                .HasPrecision(5, 2)
+                .HasDefaultValue(3.0m);
+
+            entity.Property(e => e.MinDownPaymentPercent)
+                .HasColumnName("min_down_payment_percent")
+                .HasPrecision(5, 4)
+                .HasDefaultValue(0.05m);
+
+            entity.Property(e => e.MaxTermMonths)
+                .HasColumnName("max_term_months")
+                .HasDefaultValue(24);
+
+            entity.Property(e => e.DaysToDefault)
+                .HasColumnName("days_to_default")
+                .HasDefaultValue(3);
+
+            entity.Property(e => e.LatePaymentFeePercent)
+                .HasColumnName("late_payment_fee_percent")
+                .HasPrecision(5, 4)
+                .HasDefaultValue(0.05m);
+
+            entity.Property(e => e.IsActive)
+                .HasColumnName("is_active")
+                .HasDefaultValue(true);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => new { e.WorldId, e.IsActive });
+        });
+    }
+
+    private static void ConfigureLoan(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Loan>(entity =>
+        {
+            entity.ToTable("loans");
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.PlayerWorldId)
+                .HasColumnName("player_world_id")
+                .IsRequired();
+
+            entity.Property(e => e.BankId)
+                .HasColumnName("bank_id")
+                .IsRequired();
+
+            entity.Property(e => e.LoanType)
+                .HasColumnName("loan_type")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(e => e.PrincipalAmount)
+                .HasColumnName("principal_amount")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(e => e.InterestRatePerMonth)
+                .HasColumnName("interest_rate_per_month")
+                .HasPrecision(8, 6)
+                .IsRequired();
+
+            entity.Property(e => e.TermMonths)
+                .HasColumnName("term_months")
+                .IsRequired();
+
+            entity.Property(e => e.MonthlyPayment)
+                .HasColumnName("monthly_payment")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(e => e.TotalRepaymentAmount)
+                .HasColumnName("total_repayment_amount")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(e => e.RemainingPrincipal)
+                .HasColumnName("remaining_principal")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(e => e.AccruedInterest)
+                .HasColumnName("accrued_interest")
+                .HasPrecision(18, 2)
+                .HasDefaultValue(0m);
+
+            entity.Property(e => e.TotalPaid)
+                .HasColumnName("total_paid")
+                .HasPrecision(18, 2)
+                .HasDefaultValue(0m);
+
+            entity.Property(e => e.PaymentsMade)
+                .HasColumnName("payments_made")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.PaymentsRemaining)
+                .HasColumnName("payments_remaining")
+                .IsRequired();
+
+            entity.Property(e => e.LatePaymentCount)
+                .HasColumnName("late_payment_count")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.MissedPaymentCount)
+                .HasColumnName("missed_payment_count")
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.NextPaymentDue)
+                .HasColumnName("next_payment_due")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.ApprovedAt)
+                .HasColumnName("approved_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.DisbursedAt)
+                .HasColumnName("disbursed_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.PaidOffAt)
+                .HasColumnName("paid_off_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.DefaultedAt)
+                .HasColumnName("defaulted_at")
+                .HasColumnType("timestamptz");
+
+            entity.Property(e => e.CollateralAircraftId)
+                .HasColumnName("collateral_aircraft_id");
+
+            entity.Property(e => e.Purpose)
+                .HasColumnName("purpose")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(2000);
+
+            // Relationships
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.PlayerWorld)
+                .WithMany(pw => pw.Loans)
+                .HasForeignKey(e => e.PlayerWorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Bank)
+                .WithMany(b => b.Loans)
+                .HasForeignKey(e => e.BankId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.CollateralAircraft)
+                .WithMany()
+                .HasForeignKey(e => e.CollateralAircraftId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.PlayerWorldId);
+            entity.HasIndex(e => e.BankId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.LoanType);
+            entity.HasIndex(e => new { e.PlayerWorldId, e.Status });
+            entity.HasIndex(e => new { e.WorldId, e.Status });
+            entity.HasIndex(e => e.NextPaymentDue);
+        });
+    }
+
+    private static void ConfigureLoanPayment(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<LoanPayment>(entity =>
+        {
+            entity.ToTable("loan_payments");
+
+            entity.Property(e => e.LoanId)
+                .HasColumnName("loan_id")
+                .IsRequired();
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.PaymentNumber)
+                .HasColumnName("payment_number")
+                .IsRequired();
+
+            entity.Property(e => e.Amount)
+                .HasColumnName("amount")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(e => e.PrincipalPortion)
+                .HasColumnName("principal_portion")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(e => e.InterestPortion)
+                .HasColumnName("interest_portion")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(e => e.LateFee)
+                .HasColumnName("late_fee")
+                .HasPrecision(18, 2)
+                .HasDefaultValue(0m);
+
+            entity.Property(e => e.RemainingBalanceAfter)
+                .HasColumnName("remaining_balance_after")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(e => e.DueDate)
+                .HasColumnName("due_date")
+                .HasColumnType("timestamptz")
+                .IsRequired();
+
+            entity.Property(e => e.PaidAt)
+                .HasColumnName("paid_at")
+                .HasColumnType("timestamptz")
+                .IsRequired();
+
+            entity.Property(e => e.IsLate)
+                .HasColumnName("is_late")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(500);
+
+            // Ignore computed property
+            entity.Ignore(e => e.DaysLate);
+
+            // Relationships
+            entity.HasOne(e => e.Loan)
+                .WithMany(l => l.Payments)
+                .HasForeignKey(e => e.LoanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.LoanId);
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => new { e.LoanId, e.PaymentNumber });
+            entity.HasIndex(e => e.PaidAt);
+        });
+    }
+
+    private static void ConfigureCreditScoreEvent(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CreditScoreEvent>(entity =>
+        {
+            entity.ToTable("credit_score_events");
+
+            entity.Property(e => e.PlayerWorldId)
+                .HasColumnName("player_world_id")
+                .IsRequired();
+
+            entity.Property(e => e.WorldId)
+                .HasColumnName("world_id")
+                .IsRequired();
+
+            entity.Property(e => e.EventType)
+                .HasColumnName("event_type")
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.ScoreBefore)
+                .HasColumnName("score_before")
+                .IsRequired();
+
+            entity.Property(e => e.ScoreAfter)
+                .HasColumnName("score_after")
+                .IsRequired();
+
+            entity.Property(e => e.ScoreChange)
+                .HasColumnName("score_change")
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description")
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.RelatedLoanId)
+                .HasColumnName("related_loan_id");
+
+            entity.Property(e => e.RelatedJobId)
+                .HasColumnName("related_job_id");
+
+            // Relationships
+            entity.HasOne(e => e.PlayerWorld)
+                .WithMany(pw => pw.CreditScoreEvents)
+                .HasForeignKey(e => e.PlayerWorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.World)
+                .WithMany()
+                .HasForeignKey(e => e.WorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.RelatedLoan)
+                .WithMany()
+                .HasForeignKey(e => e.RelatedLoanId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.RelatedJob)
+                .WithMany()
+                .HasForeignKey(e => e.RelatedJobId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.PlayerWorldId);
+            entity.HasIndex(e => e.WorldId);
+            entity.HasIndex(e => e.EventType);
+            entity.HasIndex(e => new { e.PlayerWorldId, e.CreatedAt });
+            entity.HasIndex(e => e.RelatedLoanId);
+        });
+    }
+
+    private static void ConfigureReputationEvent(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ReputationEvent>(entity =>
+        {
+            entity.ToTable("reputation_events");
+
+            // Properties
+            entity.Property(e => e.EventType)
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.PointChange)
+                .HasPrecision(10, 4)
+                .IsRequired();
+
+            entity.Property(e => e.ResultingScore)
+                .HasPrecision(10, 4)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(500);
+
+            entity.Property(e => e.OccurredAt)
+                .IsRequired()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Relationships
+            entity.HasOne(e => e.PlayerWorld)
+                .WithMany(pw => pw.ReputationEvents)
+                .HasForeignKey(e => e.PlayerWorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.RelatedJob)
+                .WithMany()
+                .HasForeignKey(e => e.RelatedJobId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.RelatedFlight)
+                .WithMany()
+                .HasForeignKey(e => e.RelatedFlightId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.PlayerWorldId);
+            entity.HasIndex(e => e.EventType);
+            entity.HasIndex(e => e.OccurredAt);
+            entity.HasIndex(e => new { e.PlayerWorldId, e.OccurredAt });
+        });
+    }
+
+    private static void ConfigurePlayerSkill(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PlayerSkill>(entity =>
+        {
+            entity.ToTable("player_skills");
+
+            // Properties
+            entity.Property(e => e.SkillType)
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.CurrentXp)
+                .IsRequired()
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.Level)
+                .IsRequired()
+                .HasDefaultValue(1);
+
+            entity.Property(e => e.LastUpdatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Relationships
+            entity.HasOne(e => e.PlayerWorld)
+                .WithMany(pw => pw.Skills)
+                .HasForeignKey(e => e.PlayerWorldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.PlayerWorldId);
+            entity.HasIndex(e => e.SkillType);
+            entity.HasIndex(e => new { e.PlayerWorldId, e.SkillType })
+                .IsUnique();
+        });
+    }
+
+    private static void ConfigureSkillXpEvent(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SkillXpEvent>(entity =>
+        {
+            entity.ToTable("skill_xp_events");
+
+            // Properties
+            entity.Property(e => e.XpGained)
+                .IsRequired();
+
+            entity.Property(e => e.ResultingXp)
+                .IsRequired();
+
+            entity.Property(e => e.ResultingLevel)
+                .IsRequired();
+
+            entity.Property(e => e.CausedLevelUp)
+                .IsRequired()
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.Source)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(500);
+
+            entity.Property(e => e.OccurredAt)
+                .IsRequired()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Relationships
+            entity.HasOne(e => e.PlayerSkill)
+                .WithMany(ps => ps.XpEvents)
+                .HasForeignKey(e => e.PlayerSkillId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.RelatedFlight)
+                .WithMany()
+                .HasForeignKey(e => e.RelatedFlightId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.RelatedJob)
+                .WithMany()
+                .HasForeignKey(e => e.RelatedJobId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.PlayerSkillId);
+            entity.HasIndex(e => e.OccurredAt);
+            entity.HasIndex(e => new { e.PlayerSkillId, e.OccurredAt });
         });
     }
 }

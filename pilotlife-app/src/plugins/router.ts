@@ -7,7 +7,9 @@ import DashboardView from '../views/DashboardView.vue'
 import JobsView from '../views/JobsView.vue'
 import HangarView from '../views/HangarView.vue'
 import MarketplaceView from '../views/MarketplaceView.vue'
+import LicensesView from '../views/LicensesView.vue'
 import SkillsView from '../views/SkillsView.vue'
+import ReputationView from '../views/ReputationView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import ConceptView from '../views/ConceptView.vue'
@@ -70,9 +72,19 @@ const routes = [
         component: MarketplaceView,
       },
       {
+        path: 'licenses',
+        name: 'licenses',
+        component: LicensesView,
+      },
+      {
         path: 'skills',
         name: 'skills',
         component: SkillsView,
+      },
+      {
+        path: 'reputation',
+        name: 'reputation',
+        component: ReputationView,
       },
       {
         path: 'profile',

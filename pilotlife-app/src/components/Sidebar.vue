@@ -61,6 +61,18 @@
         <span class="nav-label">Marketplace</span>
       </router-link>
 
+      <router-link to="/licenses" class="nav-item" :class="{ active: isActive('/licenses') }">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <path d="M7 8h10"/>
+            <path d="M7 12h6"/>
+            <circle cx="16" cy="14" r="2"/>
+          </svg>
+        </div>
+        <span class="nav-label">Licenses</span>
+      </router-link>
+
       <router-link to="/skills" class="nav-item" :class="{ active: isActive('/skills') }">
         <div class="nav-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -68,6 +80,15 @@
           </svg>
         </div>
         <span class="nav-label">Skills</span>
+      </router-link>
+
+      <router-link to="/reputation" class="nav-item" :class="{ active: isActive('/reputation') }">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <span class="nav-label">Reputation</span>
       </router-link>
 
       <router-link to="/concept" class="nav-item concept" :class="{ active: isActive('/concept') }">

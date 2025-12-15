@@ -31,9 +31,9 @@ FlightDataJson FlightDataJson::fromSimConnect(const SimConnectFlightData& data, 
     json.atcAirline = data.atcAirline;
     json.atcFlightNumber = data.atcFlightNumber;
     json.category = data.category;
-    json.engineType = data.engineType;
-    json.engineTypeStr = engineTypeToString(data.engineType);
-    json.numberOfEngines = data.numberOfEngines;
+    json.engineType = static_cast<int>(data.engineType);
+    json.engineTypeStr = engineTypeToString(static_cast<int>(data.engineType));
+    json.numberOfEngines = static_cast<int>(data.numberOfEngines);
     json.maxGrossWeightLbs = data.maxGrossWeight;
     json.cruiseSpeedKts = data.cruiseSpeed;
     json.emptyWeightLbs = data.emptyWeight;
@@ -81,8 +81,8 @@ FlightDataJson FlightDataJson::fromSimConnect(const SimConnectFlightData& data, 
     return json;
 }
 
-std::string FlightDataJson::formatFrequency(int freqHz) {
-    // SimConnect returns frequency in Hz (e.g., 118700000 for 118.700 MHz)
+std::string FlightDataJson::formatFrequency(double freqHz) {
+    // SimConnect returns frequency in Hz as FLOAT64 (e.g., 118700000.0 for 118.700 MHz)
     double freqMHz = freqHz / 1000000.0;
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(3) << freqMHz;

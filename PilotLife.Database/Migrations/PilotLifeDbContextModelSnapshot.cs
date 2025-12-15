@@ -835,6 +835,123 @@ namespace PilotLife.Database.Migrations
                     b.ToTable("airports", (string)null);
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.Bank", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("BaseInterestRate")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(8, 6)
+                        .HasColumnType("numeric(8,6)")
+                        .HasDefaultValue(0.02m)
+                        .HasColumnName("base_interest_rate");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DaysToDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("days_to_default");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<decimal>("LatePaymentFeePercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasDefaultValue(0.05m)
+                        .HasColumnName("late_payment_fee_percent");
+
+                    b.Property<decimal>("MaxInterestRate")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(8, 6)
+                        .HasColumnType("numeric(8,6)")
+                        .HasDefaultValue(0.08m)
+                        .HasColumnName("max_interest_rate");
+
+                    b.Property<decimal>("MaxLoanToNetWorthRatio")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(3.0m)
+                        .HasColumnName("max_loan_to_net_worth_ratio");
+
+                    b.Property<int>("MaxTermMonths")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(24)
+                        .HasColumnName("max_term_months");
+
+                    b.Property<int>("MinCreditScore")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(500)
+                        .HasColumnName("min_credit_score");
+
+                    b.Property<decimal>("MinDownPaymentPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasDefaultValue(0.05m)
+                        .HasColumnName("min_down_payment_percent");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<bool>("OffersStarterLoan")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("offers_starter_loan");
+
+                    b.Property<decimal>("StarterLoanInterestRate")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(8, 6)
+                        .HasColumnType("numeric(8,6)")
+                        .HasDefaultValue(0.015m)
+                        .HasColumnName("starter_loan_interest_rate");
+
+                    b.Property<decimal>("StarterLoanMaxAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(250000m)
+                        .HasColumnName("starter_loan_max_amount");
+
+                    b.Property<Guid>("WorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("world_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorldId");
+
+                    b.HasIndex("WorldId", "IsActive");
+
+                    b.ToTable("banks", (string)null);
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.CargoType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -953,6 +1070,77 @@ namespace PilotLife.Database.Migrations
                     b.HasIndex("Category", "Subcategory");
 
                     b.ToTable("cargo_types", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.CreditScoreEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("event_type");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<Guid>("PlayerWorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_world_id");
+
+                    b.Property<Guid?>("RelatedJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("related_job_id");
+
+                    b.Property<Guid?>("RelatedLoanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("related_loan_id");
+
+                    b.Property<int>("ScoreAfter")
+                        .HasColumnType("integer")
+                        .HasColumnName("score_after");
+
+                    b.Property<int>("ScoreBefore")
+                        .HasColumnType("integer")
+                        .HasColumnName("score_before");
+
+                    b.Property<int>("ScoreChange")
+                        .HasColumnType("integer")
+                        .HasColumnName("score_change");
+
+                    b.Property<Guid>("WorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("world_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventType");
+
+                    b.HasIndex("PlayerWorldId");
+
+                    b.HasIndex("RelatedJobId");
+
+                    b.HasIndex("RelatedLoanId");
+
+                    b.HasIndex("WorldId");
+
+                    b.HasIndex("PlayerWorldId", "CreatedAt");
+
+                    b.ToTable("credit_score_events", (string)null);
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.DealerInventory", b =>
@@ -1076,6 +1264,358 @@ namespace PilotLife.Database.Migrations
                     b.HasIndex("DealerId", "IsSold");
 
                     b.ToTable("dealer_inventory", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.ExamCheckpoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("AltitudeAtReach")
+                        .HasColumnType("integer")
+                        .HasColumnName("altitude_at_reach");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exam_id");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude");
+
+                    b.Property<int>("MaxPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_points");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("order");
+
+                    b.Property<int>("PointsAwarded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("points_awarded");
+
+                    b.Property<double>("RadiusNm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("double precision")
+                        .HasDefaultValue(1.0)
+                        .HasColumnName("radius_nm");
+
+                    b.Property<DateTimeOffset?>("ReachedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("reached_at");
+
+                    b.Property<int?>("RequiredAltitudeFt")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_altitude_ft");
+
+                    b.Property<int?>("SpeedAtReachKts")
+                        .HasColumnType("integer")
+                        .HasColumnName("speed_at_reach_kts");
+
+                    b.Property<bool>("WasReached")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("was_reached");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExamId");
+
+                    b.HasIndex("ExamId", "Order");
+
+                    b.ToTable("exam_checkpoints", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.ExamLanding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AirportIcao")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("airport_icao");
+
+                    b.Property<float?>("BankDeg")
+                        .HasColumnType("real")
+                        .HasColumnName("bank_deg");
+
+                    b.Property<float>("CenterlineDeviationFt")
+                        .HasColumnType("real")
+                        .HasColumnName("centerline_deviation_ft");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exam_id");
+
+                    b.Property<bool>("GearDown")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("gear_down");
+
+                    b.Property<float?>("GroundSpeedKts")
+                        .HasColumnType("real")
+                        .HasColumnName("ground_speed_kts");
+
+                    b.Property<DateTimeOffset>("LandedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("landed_at");
+
+                    b.Property<int>("MaxPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_points");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("order");
+
+                    b.Property<float?>("PitchDeg")
+                        .HasColumnType("real")
+                        .HasColumnName("pitch_deg");
+
+                    b.Property<int>("PointsAwarded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("points_awarded");
+
+                    b.Property<string>("RunwayUsed")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("runway_used");
+
+                    b.Property<float>("TouchdownZoneDistanceFt")
+                        .HasColumnType("real")
+                        .HasColumnName("touchdown_zone_distance_ft");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("type");
+
+                    b.Property<float>("VerticalSpeedFpm")
+                        .HasColumnType("real")
+                        .HasColumnName("vertical_speed_fpm");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExamId");
+
+                    b.HasIndex("ExamId", "Order");
+
+                    b.ToTable("exam_landings", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.ExamManeuver", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("AltitudeDeviationFt")
+                        .HasColumnType("integer")
+                        .HasColumnName("altitude_deviation_ft");
+
+                    b.Property<int?>("AltitudeToleranceFt")
+                        .HasColumnType("integer")
+                        .HasColumnName("altitude_tolerance_ft");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exam_id");
+
+                    b.Property<int?>("HeadingDeviationDeg")
+                        .HasColumnType("integer")
+                        .HasColumnName("heading_deviation_deg");
+
+                    b.Property<int?>("HeadingToleranceDeg")
+                        .HasColumnType("integer")
+                        .HasColumnName("heading_tolerance_deg");
+
+                    b.Property<bool>("IsRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_required");
+
+                    b.Property<string>("ManeuverType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("maneuver_type");
+
+                    b.Property<int>("MaxPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_points");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("order");
+
+                    b.Property<int>("PointsAwarded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("points_awarded");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("NotAttempted")
+                        .HasColumnName("result");
+
+                    b.Property<int?>("SpeedDeviationKts")
+                        .HasColumnType("integer")
+                        .HasColumnName("speed_deviation_kts");
+
+                    b.Property<int?>("SpeedToleranceKts")
+                        .HasColumnType("integer")
+                        .HasColumnName("speed_tolerance_kts");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExamId");
+
+                    b.HasIndex("ExamId", "Order");
+
+                    b.ToTable("exam_maneuvers", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.ExamViolation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("AltitudeAtViolation")
+                        .HasColumnType("integer")
+                        .HasColumnName("altitude_at_violation");
+
+                    b.Property<bool>("CausedFailure")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("caused_failure");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exam_id");
+
+                    b.Property<double>("LatitudeAtViolation")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude_at_violation");
+
+                    b.Property<double>("LongitudeAtViolation")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude_at_violation");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<int>("PointsDeducted")
+                        .HasColumnType("integer")
+                        .HasColumnName("points_deducted");
+
+                    b.Property<float>("Threshold")
+                        .HasColumnType("real")
+                        .HasColumnName("threshold");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("type");
+
+                    b.Property<float>("Value")
+                        .HasColumnType("real")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExamId");
+
+                    b.HasIndex("Type");
+
+                    b.HasIndex("ExamId", "OccurredAt");
+
+                    b.ToTable("exam_violations", (string)null);
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.FlightFinancials", b =>
@@ -1470,6 +2010,493 @@ namespace PilotLife.Database.Migrations
                     b.ToTable("jobs", (string)null);
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.LicenseExam", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AircraftUsed")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("aircraft_used");
+
+                    b.Property<int?>("AssignedAltitudeFt")
+                        .HasColumnType("integer")
+                        .HasColumnName("assigned_altitude_ft");
+
+                    b.Property<int>("AttemptNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("attempt_number");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DepartureIcao")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("departure_icao");
+
+                    b.Property<double?>("DistanceFlownNm")
+                        .HasColumnType("double precision")
+                        .HasColumnName("distance_flown_nm");
+
+                    b.Property<DateTimeOffset?>("EligibleForRetakeAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("eligible_for_retake_at");
+
+                    b.Property<string>("ExaminerNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("examiner_notes");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<decimal>("FeePaid")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("fee_paid");
+
+                    b.Property<int?>("FlightTimeMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("flight_time_minutes");
+
+                    b.Property<Guid>("LicenseTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("license_type_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<int>("PassingScore")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(70)
+                        .HasColumnName("passing_score");
+
+                    b.Property<Guid>("PlayerWorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_world_id");
+
+                    b.Property<string>("RequiredAircraftCategory")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("required_aircraft_category");
+
+                    b.Property<string>("RequiredAircraftType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("required_aircraft_type");
+
+                    b.Property<string>("RouteJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("route_json");
+
+                    b.Property<DateTimeOffset>("ScheduledAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("scheduled_at");
+
+                    b.Property<int>("Score")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("score");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TimeLimitMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("time_limit_minutes");
+
+                    b.Property<Guid>("WorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("world_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LicenseTypeId");
+
+                    b.HasIndex("PlayerWorldId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("WorldId");
+
+                    b.HasIndex("PlayerWorldId", "Status");
+
+                    b.HasIndex("PlayerWorldId", "LicenseTypeId", "Status");
+
+                    b.ToTable("license_exams", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.LicenseType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("BaseExamCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("base_exam_cost");
+
+                    b.Property<decimal?>("BaseRenewalCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("base_renewal_cost");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("display_order");
+
+                    b.Property<int>("ExamDurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("exam_duration_minutes");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("PassingScore")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(70)
+                        .HasColumnName("passing_score");
+
+                    b.Property<string>("PrerequisiteLicensesJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("prerequisite_licenses_json");
+
+                    b.Property<string>("RequiredAircraftCategory")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("required_aircraft_category");
+
+                    b.Property<string>("RequiredAircraftType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("required_aircraft_type");
+
+                    b.Property<int?>("ValidityGameDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("validity_game_days");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("DisplayOrder");
+
+                    b.HasIndex("IsActive");
+
+                    b.ToTable("license_types", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.Loan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AccruedInterest")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("accrued_interest");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid>("BankId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bank_id");
+
+                    b.Property<Guid?>("CollateralAircraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("collateral_aircraft_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DefaultedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("defaulted_at");
+
+                    b.Property<DateTimeOffset?>("DisbursedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("disbursed_at");
+
+                    b.Property<decimal>("InterestRatePerMonth")
+                        .HasPrecision(8, 6)
+                        .HasColumnType("numeric(8,6)")
+                        .HasColumnName("interest_rate_per_month");
+
+                    b.Property<int>("LatePaymentCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("late_payment_count");
+
+                    b.Property<string>("LoanType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("loan_type");
+
+                    b.Property<int>("MissedPaymentCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("missed_payment_count");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<decimal>("MonthlyPayment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("monthly_payment");
+
+                    b.Property<DateTimeOffset?>("NextPaymentDue")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("next_payment_due");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTimeOffset?>("PaidOffAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("paid_off_at");
+
+                    b.Property<int>("PaymentsMade")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("payments_made");
+
+                    b.Property<int>("PaymentsRemaining")
+                        .HasColumnType("integer")
+                        .HasColumnName("payments_remaining");
+
+                    b.Property<Guid>("PlayerWorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_world_id");
+
+                    b.Property<decimal>("PrincipalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("principal_amount");
+
+                    b.Property<string>("Purpose")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("purpose");
+
+                    b.Property<decimal>("RemainingPrincipal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("remaining_principal");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TermMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("term_months");
+
+                    b.Property<decimal>("TotalPaid")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("total_paid");
+
+                    b.Property<decimal>("TotalRepaymentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_repayment_amount");
+
+                    b.Property<Guid>("WorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("world_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BankId");
+
+                    b.HasIndex("CollateralAircraftId");
+
+                    b.HasIndex("LoanType");
+
+                    b.HasIndex("NextPaymentDue");
+
+                    b.HasIndex("PlayerWorldId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("WorldId");
+
+                    b.HasIndex("PlayerWorldId", "Status");
+
+                    b.HasIndex("WorldId", "Status");
+
+                    b.ToTable("loans", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.LoanPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("DueDate")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("due_date");
+
+                    b.Property<decimal>("InterestPortion")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("interest_portion");
+
+                    b.Property<bool>("IsLate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_late");
+
+                    b.Property<decimal>("LateFee")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("late_fee");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("loan_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTimeOffset>("PaidAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("paid_at");
+
+                    b.Property<int>("PaymentNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("payment_number");
+
+                    b.Property<decimal>("PrincipalPortion")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("principal_portion");
+
+                    b.Property<decimal>("RemainingBalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("remaining_balance_after");
+
+                    b.Property<Guid>("WorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("world_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LoanId");
+
+                    b.HasIndex("PaidAt");
+
+                    b.HasIndex("WorldId");
+
+                    b.HasIndex("LoanId", "PaymentNumber");
+
+                    b.ToTable("loan_payments", (string)null);
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.MaintenanceLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1804,6 +2831,55 @@ namespace PilotLife.Database.Migrations
                     b.ToTable("owned_aircraft", (string)null);
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.PlayerSkill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CurrentXp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTimeOffset>("LastUpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("Level")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<Guid>("PlayerWorldId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SkillType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerWorldId");
+
+                    b.HasIndex("SkillType");
+
+                    b.HasIndex("PlayerWorldId", "SkillType")
+                        .IsUnique();
+
+                    b.ToTable("player_skills", (string)null);
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.PlayerWorld", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1983,6 +3059,69 @@ namespace PilotLife.Database.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.ReputationEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("PlayerWorldId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PointChange")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<Guid?>("RelatedFlightId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RelatedJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ResultingScore")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventType");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("PlayerWorldId");
+
+                    b.HasIndex("RelatedFlightId");
+
+                    b.HasIndex("RelatedJobId");
+
+                    b.HasIndex("PlayerWorldId", "OccurredAt");
+
+                    b.ToTable("reputation_events", (string)null);
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.Role", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2054,6 +3193,72 @@ namespace PilotLife.Database.Migrations
                     b.HasKey("RoleId", "Permission");
 
                     b.ToTable("role_permissions", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.SkillXpEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CausedLevelUp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("PlayerSkillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RelatedFlightId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RelatedJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ResultingLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ResultingXp")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("XpGained")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("PlayerSkillId");
+
+                    b.HasIndex("RelatedFlightId");
+
+                    b.HasIndex("RelatedJobId");
+
+                    b.HasIndex("PlayerSkillId", "OccurredAt");
+
+                    b.ToTable("skill_xp_events", (string)null);
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.TrackedFlight", b =>
@@ -2322,6 +3527,105 @@ namespace PilotLife.Database.Migrations
                     b.HasIndex("HomeAirportId");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.UserLicense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("EarnedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("earned_at");
+
+                    b.Property<int>("ExamAttempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("exam_attempts");
+
+                    b.Property<int>("ExamScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("exam_score");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("expires_at");
+
+                    b.Property<bool>("IsRevoked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_revoked");
+
+                    b.Property<bool>("IsValid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_valid");
+
+                    b.Property<DateTimeOffset?>("LastRenewedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("last_renewed_at");
+
+                    b.Property<Guid>("LicenseTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("license_type_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at");
+
+                    b.Property<Guid?>("PassedExamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("passed_exam_id");
+
+                    b.Property<Guid>("PlayerWorldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("player_world_id");
+
+                    b.Property<int>("RenewalCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("renewal_count");
+
+                    b.Property<string>("RevocationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("revocation_reason");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<decimal>("TotalPaid")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_paid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("IsValid");
+
+                    b.HasIndex("LicenseTypeId");
+
+                    b.HasIndex("PassedExamId")
+                        .IsUnique();
+
+                    b.HasIndex("PlayerWorldId");
+
+                    b.HasIndex("PlayerWorldId", "LicenseTypeId")
+                        .IsUnique();
+
+                    b.ToTable("user_licenses", (string)null);
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.UserRole", b =>
@@ -2736,6 +4040,50 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("ReviewedByUser");
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.Bank", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.World", "World")
+                        .WithMany()
+                        .HasForeignKey("WorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("World");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.CreditScoreEvent", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.PlayerWorld", "PlayerWorld")
+                        .WithMany("CreditScoreEvents")
+                        .HasForeignKey("PlayerWorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.Job", "RelatedJob")
+                        .WithMany()
+                        .HasForeignKey("RelatedJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PilotLife.Domain.Entities.Loan", "RelatedLoan")
+                        .WithMany()
+                        .HasForeignKey("RelatedLoanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PilotLife.Domain.Entities.World", "World")
+                        .WithMany()
+                        .HasForeignKey("WorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PlayerWorld");
+
+                    b.Navigation("RelatedJob");
+
+                    b.Navigation("RelatedLoan");
+
+                    b.Navigation("World");
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.DealerInventory", b =>
                 {
                     b.HasOne("PilotLife.Domain.Entities.Aircraft", "Aircraft")
@@ -2761,6 +4109,50 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("Dealer");
 
                     b.Navigation("World");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.ExamCheckpoint", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.LicenseExam", "Exam")
+                        .WithMany("Checkpoints")
+                        .HasForeignKey("ExamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Exam");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.ExamLanding", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.LicenseExam", "Exam")
+                        .WithMany("Landings")
+                        .HasForeignKey("ExamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Exam");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.ExamManeuver", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.LicenseExam", "Exam")
+                        .WithMany("Maneuvers")
+                        .HasForeignKey("ExamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Exam");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.ExamViolation", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.LicenseExam", "Exam")
+                        .WithMany("Violations")
+                        .HasForeignKey("ExamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Exam");
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.FlightFinancials", b =>
@@ -2841,6 +4233,86 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("World");
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.LicenseExam", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.LicenseType", "LicenseType")
+                        .WithMany("Exams")
+                        .HasForeignKey("LicenseTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.PlayerWorld", "PlayerWorld")
+                        .WithMany()
+                        .HasForeignKey("PlayerWorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.World", "World")
+                        .WithMany()
+                        .HasForeignKey("WorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LicenseType");
+
+                    b.Navigation("PlayerWorld");
+
+                    b.Navigation("World");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.Loan", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.Bank", "Bank")
+                        .WithMany("Loans")
+                        .HasForeignKey("BankId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.OwnedAircraft", "CollateralAircraft")
+                        .WithMany()
+                        .HasForeignKey("CollateralAircraftId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PilotLife.Domain.Entities.PlayerWorld", "PlayerWorld")
+                        .WithMany("Loans")
+                        .HasForeignKey("PlayerWorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.World", "World")
+                        .WithMany()
+                        .HasForeignKey("WorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bank");
+
+                    b.Navigation("CollateralAircraft");
+
+                    b.Navigation("PlayerWorld");
+
+                    b.Navigation("World");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.LoanPayment", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.Loan", "Loan")
+                        .WithMany("Payments")
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.World", "World")
+                        .WithMany()
+                        .HasForeignKey("WorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Loan");
+
+                    b.Navigation("World");
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.MaintenanceLog", b =>
                 {
                     b.HasOne("PilotLife.Domain.Entities.AircraftComponent", "AircraftComponent")
@@ -2894,6 +4366,17 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("World");
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.PlayerSkill", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.PlayerWorld", "PlayerWorld")
+                        .WithMany("Skills")
+                        .HasForeignKey("PlayerWorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PlayerWorld");
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.PlayerWorld", b =>
                 {
                     b.HasOne("PilotLife.Domain.Entities.Airport", "CurrentAirport")
@@ -2938,6 +4421,31 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.ReputationEvent", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.PlayerWorld", "PlayerWorld")
+                        .WithMany("ReputationEvents")
+                        .HasForeignKey("PlayerWorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.TrackedFlight", "RelatedFlight")
+                        .WithMany()
+                        .HasForeignKey("RelatedFlightId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PilotLife.Domain.Entities.Job", "RelatedJob")
+                        .WithMany()
+                        .HasForeignKey("RelatedJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("PlayerWorld");
+
+                    b.Navigation("RelatedFlight");
+
+                    b.Navigation("RelatedJob");
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.RolePermission", b =>
                 {
                     b.HasOne("PilotLife.Domain.Entities.Role", "Role")
@@ -2947,6 +4455,31 @@ namespace PilotLife.Database.Migrations
                         .IsRequired();
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.SkillXpEvent", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.PlayerSkill", "PlayerSkill")
+                        .WithMany("XpEvents")
+                        .HasForeignKey("PlayerSkillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.TrackedFlight", "RelatedFlight")
+                        .WithMany()
+                        .HasForeignKey("RelatedFlightId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PilotLife.Domain.Entities.Job", "RelatedJob")
+                        .WithMany()
+                        .HasForeignKey("RelatedJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("PlayerSkill");
+
+                    b.Navigation("RelatedFlight");
+
+                    b.Navigation("RelatedJob");
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.TrackedFlight", b =>
@@ -3000,6 +4533,32 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("CurrentAirport");
 
                     b.Navigation("HomeAirport");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.UserLicense", b =>
+                {
+                    b.HasOne("PilotLife.Domain.Entities.LicenseType", "LicenseType")
+                        .WithMany("UserLicenses")
+                        .HasForeignKey("LicenseTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PilotLife.Domain.Entities.LicenseExam", "PassedExam")
+                        .WithOne("EarnedLicense")
+                        .HasForeignKey("PilotLife.Domain.Entities.UserLicense", "PassedExamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PilotLife.Domain.Entities.PlayerWorld", "PlayerWorld")
+                        .WithMany()
+                        .HasForeignKey("PlayerWorldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LicenseType");
+
+                    b.Navigation("PassedExam");
+
+                    b.Navigation("PlayerWorld");
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.UserRole", b =>
@@ -3059,6 +4618,36 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("Inventory");
                 });
 
+            modelBuilder.Entity("PilotLife.Domain.Entities.Bank", b =>
+                {
+                    b.Navigation("Loans");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.LicenseExam", b =>
+                {
+                    b.Navigation("Checkpoints");
+
+                    b.Navigation("EarnedLicense");
+
+                    b.Navigation("Landings");
+
+                    b.Navigation("Maneuvers");
+
+                    b.Navigation("Violations");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.LicenseType", b =>
+                {
+                    b.Navigation("Exams");
+
+                    b.Navigation("UserLicenses");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.Loan", b =>
+                {
+                    b.Navigation("Payments");
+                });
+
             modelBuilder.Entity("PilotLife.Domain.Entities.OwnedAircraft", b =>
                 {
                     b.Navigation("Components");
@@ -3066,6 +4655,22 @@ namespace PilotLife.Database.Migrations
                     b.Navigation("MaintenanceLogs");
 
                     b.Navigation("Modifications");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.PlayerSkill", b =>
+                {
+                    b.Navigation("XpEvents");
+                });
+
+            modelBuilder.Entity("PilotLife.Domain.Entities.PlayerWorld", b =>
+                {
+                    b.Navigation("CreditScoreEvents");
+
+                    b.Navigation("Loans");
+
+                    b.Navigation("ReputationEvents");
+
+                    b.Navigation("Skills");
                 });
 
             modelBuilder.Entity("PilotLife.Domain.Entities.Role", b =>
