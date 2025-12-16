@@ -54,9 +54,59 @@ export interface SimulatorStatus {
     connectionError?: string;
 }
 
+export interface AircraftFileData {
+    found: boolean;
+    requestId: string;
+    manifest?: {
+        packagePath: string;
+        contentType: string;
+        title: string;
+        manufacturer: string;
+        creator: string;
+        packageVersion: string;
+        minimumGameVersion: string;
+        totalPackageSize: string;
+        contentId: string;
+        rawJson: string;
+    };
+    aircraftCfg?: {
+        // [FLTSIM.0] section
+        title: string;
+        model: string;
+        panel: string;
+        sound: string;
+        texture: string;
+        atcType: string;
+        atcModel: string;
+        atcId: string;
+        atcAirline: string;
+        uiManufacturer: string;
+        uiType: string;
+        uiVariation: string;
+        icaoAirline: string;
+        // [GENERAL] section
+        generalAtcType: string;
+        generalAtcModel: string;
+        editable: string;
+        performance: string;
+        category: string;
+        rawContent: string;
+    };
+}
+
+export interface MSFSPathsInfo {
+    userCfgOptPath: string;
+    configFilePath: string;
+    indexedAircraftCount: number;
+    searchPaths: string[];
+}
+
 type FlightDataHandler = (data: FlightData) => void;
 type StatusHandler = (status: SimulatorStatus) => void;
 type ConnectionHandler = (connected: boolean) => void;
+type MSFSPathsHandler = (paths: MSFSPathsInfo) => void;
+
+type AircraftDataResponseHandler = (data: AircraftFileData) => void;
 
 class ConnectorService {
     private ws: WebSocket | null = null;
@@ -64,8 +114,11 @@ class ConnectorService {
     private flightDataHandlers: FlightDataHandler[] = [];
     private statusHandlers: StatusHandler[] = [];
     private connectionHandlers: ConnectionHandler[] = [];
+    private msfsPathsHandlers: MSFSPathsHandler[] = [];
     private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     private isStarted = false;
+    private pendingAircraftDataRequests: Map<string, AircraftDataResponseHandler> = new Map();
+    private currentMSFSPaths: MSFSPathsInfo | null = null;
 
     /**
      * Start the connector process and establish WebSocket connection
@@ -164,6 +217,63 @@ class ConnectorService {
         };
     }
 
+    /**
+     * Subscribe to MSFS paths info updates
+     * @returns Unsubscribe function
+     */
+    onMSFSPaths(handler: MSFSPathsHandler): () => void {
+        this.msfsPathsHandlers.push(handler);
+        // If we already have paths info, call the handler immediately
+        if (this.currentMSFSPaths) {
+            handler(this.currentMSFSPaths);
+        }
+        return () => {
+            const idx = this.msfsPathsHandlers.indexOf(handler);
+            if (idx > -1) this.msfsPathsHandlers.splice(idx, 1);
+        };
+    }
+
+    /**
+     * Get current MSFS paths info (if available)
+     */
+    getMSFSPaths(): MSFSPathsInfo | null {
+        return this.currentMSFSPaths;
+    }
+
+    /**
+     * Request aircraft file data (manifest.json and aircraft.cfg) from the connector
+     * @param aircraftTitle The title of the aircraft to look up
+     * @param timeout Timeout in milliseconds (default 10000)
+     * @returns Promise resolving to the aircraft file data
+     */
+    requestAircraftData(aircraftTitle: string, timeout = 10000): Promise<AircraftFileData> {
+        return new Promise((resolve, reject) => {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                reject(new Error('WebSocket not connected'));
+                return;
+            }
+
+            const requestId = crypto.randomUUID();
+            const timeoutId = setTimeout(() => {
+                this.pendingAircraftDataRequests.delete(requestId);
+                reject(new Error('Request timed out'));
+            }, timeout);
+
+            this.pendingAircraftDataRequests.set(requestId, (data) => {
+                clearTimeout(timeoutId);
+                resolve(data);
+            });
+
+            const request = {
+                type: 'getAircraftData',
+                requestId,
+                aircraftTitle
+            };
+
+            this.ws.send(JSON.stringify(request));
+        });
+    }
+
     private notifyConnectionStatus(connected: boolean): void {
         this.connectionHandlers.forEach(h => h(connected));
     }
@@ -198,6 +308,62 @@ class ConnectorService {
                     this.flightDataHandlers.forEach(h => h(message.data));
                 } else if (message.type === 'status') {
                     this.statusHandlers.forEach(h => h(message.data));
+                } else if (message.type === 'msfsPaths') {
+                    // Handle MSFS paths info
+                    const pathsInfo: MSFSPathsInfo = {
+                        userCfgOptPath: message.data?.userCfgOptPath || '',
+                        configFilePath: message.data?.configFilePath || '',
+                        indexedAircraftCount: message.data?.indexedAircraftCount || 0,
+                        searchPaths: message.data?.searchPaths || []
+                    };
+                    this.currentMSFSPaths = pathsInfo;
+                    this.msfsPathsHandlers.forEach(h => h(pathsInfo));
+                } else if (message.type === 'aircraftDataResponse') {
+                    // Handle aircraft file data response
+                    const requestId = message.requestId as string;
+                    const handler = this.pendingAircraftDataRequests.get(requestId);
+                    if (handler) {
+                        // Transform the response to match AircraftFileData interface
+                        const data: AircraftFileData = {
+                            found: message.data?.found ?? false,
+                            requestId: requestId,
+                            manifest: message.data?.manifest ? {
+                                packagePath: message.data.manifest.packagePath || '',
+                                contentType: message.data.manifest.contentType || '',
+                                title: message.data.manifest.title || '',
+                                manufacturer: message.data.manifest.manufacturer || '',
+                                creator: message.data.manifest.creator || '',
+                                packageVersion: message.data.manifest.packageVersion || '',
+                                minimumGameVersion: message.data.manifest.minimumGameVersion || '',
+                                totalPackageSize: message.data.manifest.totalPackageSize || '',
+                                contentId: message.data.manifest.contentId || '',
+                                rawJson: message.data.manifest.raw || ''
+                            } : undefined,
+                            aircraftCfg: message.data?.config ? {
+                                title: message.data.config.title || '',
+                                model: message.data.config.model || '',
+                                panel: message.data.config.panel || '',
+                                sound: message.data.config.sound || '',
+                                texture: message.data.config.texture || '',
+                                atcType: message.data.config.atcType || '',
+                                atcModel: message.data.config.atcModel || '',
+                                atcId: message.data.config.atcId || '',
+                                atcAirline: message.data.config.atcAirline || '',
+                                uiManufacturer: message.data.config.uiManufacturer || '',
+                                uiType: message.data.config.uiType || '',
+                                uiVariation: message.data.config.uiVariation || '',
+                                icaoAirline: message.data.config.icaoAirline || '',
+                                generalAtcType: message.data.config.generalAtcType || '',
+                                generalAtcModel: message.data.config.generalAtcModel || '',
+                                editable: message.data.config.editable || '',
+                                performance: message.data.config.performance || '',
+                                category: message.data.config.category || '',
+                                rawContent: message.data.config.raw || ''
+                            } : undefined
+                        };
+                        handler(data);
+                        this.pendingAircraftDataRequests.delete(requestId);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to parse WebSocket message:', error);

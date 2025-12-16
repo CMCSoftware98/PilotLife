@@ -20,7 +20,7 @@ import AppLayout from '../layouts/AppLayout.vue'
 import { useUserStore } from '../stores/user'
 import { useSettingsStore } from '../stores/settings'
 import { useWorldStore } from '../stores/world'
-import { api } from '../services/api'
+import { api, setOnAuthFailure } from '../services/api'
 
 const routes = [
   {
@@ -128,6 +128,16 @@ const router = createRouter({
   routes,
 })
 
+// Set up global auth failure handler to redirect to login
+setOnAuthFailure(() => {
+  // Clear any stored state and redirect to login
+  const userStore = useUserStore()
+  const worldStore = useWorldStore()
+  userStore.clearUser()
+  worldStore.clearWorlds()
+  router.push('/')
+})
+
 router.beforeEach(async (to, _from, next) => {
   const userStore = useUserStore()
   const settingsStore = useSettingsStore()
@@ -175,7 +185,14 @@ router.beforeEach(async (to, _from, next) => {
     // User is logged in, check their world status
     // Load worlds data if not already loaded
     if (worldStore.playerWorlds.value.length === 0) {
-      await worldStore.loadMyWorlds()
+      const success = await worldStore.loadMyWorlds()
+      // If load failed and we're no longer authenticated, redirect to login
+      if (!success && !api.auth.isAuthenticated()) {
+        userStore.clearUser()
+        worldStore.clearWorlds()
+        next('/')
+        return
+      }
     }
 
     const hasJoinedWorld = worldStore.playerWorlds.value.length > 0
@@ -196,7 +213,14 @@ router.beforeEach(async (to, _from, next) => {
   if (isAuthenticated) {
     // Load worlds data if not already loaded
     if (worldStore.playerWorlds.value.length === 0) {
-      await worldStore.loadMyWorlds()
+      const success = await worldStore.loadMyWorlds()
+      // If load failed and we're no longer authenticated, redirect to login
+      if (!success && !api.auth.isAuthenticated()) {
+        userStore.clearUser()
+        worldStore.clearWorlds()
+        next('/')
+        return
+      }
     }
 
     const hasJoinedWorld = worldStore.playerWorlds.value.length > 0

@@ -502,10 +502,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\ProcessDetector.cpp" />
     <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\WebSocketServer.cpp" />
     <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\FlightData.cpp" />
+    <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\AircraftIndexer.cpp" />
     <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\SimConnectManager.h" />
     <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\ProcessDetector.h" />
     <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\WebSocketServer.h" />
     <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\FlightData.h" />
+    <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\AircraftIndexer.h" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

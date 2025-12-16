@@ -644,6 +644,77 @@ interface CreateAircraftRequestData {
   emptyWeightLbs: number;
   cruiseSpeedKts: number;
   simulatorVersion?: string;
+  // Raw file contents
+  manifestJsonRaw?: string;
+  aircraftCfgRaw?: string;
+  // Manifest fields
+  manifestContentType?: string;
+  manifestTitle?: string;
+  manifestManufacturer?: string;
+  manifestCreator?: string;
+  manifestPackageVersion?: string;
+  manifestMinimumGameVersion?: string;
+  manifestTotalPackageSize?: string;
+  manifestContentId?: string;
+  // Aircraft.cfg [FLTSIM.0] fields
+  cfgTitle?: string;
+  cfgModel?: string;
+  cfgPanel?: string;
+  cfgSound?: string;
+  cfgTexture?: string;
+  cfgAtcType?: string;
+  cfgAtcModel?: string;
+  cfgAtcId?: string;
+  cfgAtcAirline?: string;
+  cfgUiManufacturer?: string;
+  cfgUiType?: string;
+  cfgUiVariation?: string;
+  cfgIcaoAirline?: string;
+  // Aircraft.cfg [GENERAL] fields
+  cfgGeneralAtcType?: string;
+  cfgGeneralAtcModel?: string;
+  cfgEditable?: string;
+  cfgPerformance?: string;
+  cfgCategory?: string;
+}
+
+interface ManifestDataResponse {
+  contentType?: string;
+  title?: string;
+  manufacturer?: string;
+  creator?: string;
+  packageVersion?: string;
+  minimumGameVersion?: string;
+  totalPackageSize?: string;
+  contentId?: string;
+}
+
+interface AircraftCfgDataResponse {
+  // [FLTSIM.0] section
+  title?: string;
+  model?: string;
+  panel?: string;
+  sound?: string;
+  texture?: string;
+  atcType?: string;
+  atcModel?: string;
+  atcId?: string;
+  atcAirline?: string;
+  uiManufacturer?: string;
+  uiType?: string;
+  uiVariation?: string;
+  icaoAirline?: string;
+  // [GENERAL] section
+  generalAtcType?: string;
+  generalAtcModel?: string;
+  editable?: string;
+  performance?: string;
+  category?: string;
+}
+
+interface AircraftRequestCheckResponse {
+  status: 'none' | 'pending' | 'approved' | 'rejected' | 'exists';
+  requestId?: string;
 }
 
 interface AircraftRequestResponse {
@@ -664,6 +735,10 @@ interface AircraftRequestResponse {
   requestedByUserName?: string;
   createdAt: string;
   reviewedAt?: string;
+  // File data
+  hasFileData: boolean;
+  manifestData?: ManifestDataResponse;
+  aircraftCfgData?: AircraftCfgDataResponse;
 }
 
 interface AircraftResponse {
@@ -707,6 +782,22 @@ function clearTokens(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(TOKEN_EXPIRY_KEY);
+}
+
+// Callback for handling authentication failures globally
+let onAuthFailureCallback: (() => void) | null = null;
+
+function setOnAuthFailure(callback: () => void): void {
+  onAuthFailureCallback = callback;
+}
+
+function handleAuthFailure(): void {
+  clearTokens();
+  localStorage.removeItem('pilotlife_user');
+  localStorage.removeItem('pilotlife_current_world_id');
+  if (onAuthFailureCallback) {
+    onAuthFailureCallback();
+  }
 }
 
 function isTokenExpired(): boolean {
@@ -756,6 +847,7 @@ async function request<T>(
       if (isTokenExpired()) {
         const refreshed = await refreshAccessToken();
         if (!refreshed) {
+          handleAuthFailure();
           return { error: 'Session expired. Please log in again.' };
         }
       }
@@ -780,12 +872,18 @@ async function request<T>(
           ...options,
           headers,
         });
+        if (retryResponse.status === 401) {
+          // Still getting 401 after refresh - user no longer exists or token is invalid
+          handleAuthFailure();
+          return { error: 'Session expired. Please log in again.' };
+        }
         const data = await retryResponse.json();
         if (!retryResponse.ok) {
           return { error: data.message || 'An error occurred' };
         }
         return { data };
       }
+      handleAuthFailure();
       return { error: 'Session expired. Please log in again.' };
     }
 
@@ -801,6 +899,9 @@ async function request<T>(
     return { error: 'Unable to connect to server. Please try again.' };
   }
 }
+
+// Export the auth failure handler setter for router integration
+export { setOnAuthFailure };
 
 export const api = {
   auth: {
@@ -1033,6 +1134,9 @@ export const api = {
       request<void>(`/api/aircraftrequests/${id}`, {
         method: 'DELETE',
       }, true),
+
+    checkExistingRequest: (aircraftTitle: string): Promise<ApiResponse<AircraftRequestCheckResponse>> =>
+      request<AircraftRequestCheckResponse>(`/api/aircraftrequests/check/${encodeURIComponent(aircraftTitle)}`, {}, true),
   },
 
   aircraft: {
@@ -1375,6 +1479,9 @@ export type {
   AircraftRequestResponse,
   AircraftResponse,
   CreateAircraftRequestData,
+  ManifestDataResponse,
+  AircraftCfgDataResponse,
+  AircraftRequestCheckResponse,
   WorldResponse,
   PlayerWorldResponse,
   DealerResponse,

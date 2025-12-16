@@ -45,6 +45,7 @@ set(SOURCES
     src/ProcessDetector.cpp
     src/WebSocketServer.cpp
     src/FlightData.cpp
+    src/AircraftIndexer.cpp
 )
 
 set(HEADERS
@@ -52,6 +53,7 @@ set(HEADERS
     src/ProcessDetector.h
     src/WebSocketServer.h
     src/FlightData.h
+    src/AircraftIndexer.h
 )
 
 # Create executable

@@ -101,7 +101,37 @@ public class AircraftRequestsController : ControllerBase
             CruiseSpeedKts = request.CruiseSpeedKts,
             SimulatorVersion = request.SimulatorVersion,
             RequestedByUserId = userId.Value,
-            Status = AircraftRequestStatus.Pending
+            Status = AircraftRequestStatus.Pending,
+
+            // File data
+            ManifestJsonRaw = request.ManifestJsonRaw,
+            AircraftCfgRaw = request.AircraftCfgRaw,
+            ManifestContentType = request.ManifestContentType,
+            ManifestTitle = request.ManifestTitle,
+            ManifestManufacturer = request.ManifestManufacturer,
+            ManifestCreator = request.ManifestCreator,
+            ManifestPackageVersion = request.ManifestPackageVersion,
+            ManifestMinimumGameVersion = request.ManifestMinimumGameVersion,
+            ManifestTotalPackageSize = request.ManifestTotalPackageSize,
+            ManifestContentId = request.ManifestContentId,
+            CfgTitle = request.CfgTitle,
+            CfgModel = request.CfgModel,
+            CfgPanel = request.CfgPanel,
+            CfgSound = request.CfgSound,
+            CfgTexture = request.CfgTexture,
+            CfgAtcType = request.CfgAtcType,
+            CfgAtcModel = request.CfgAtcModel,
+            CfgAtcId = request.CfgAtcId,
+            CfgAtcAirline = request.CfgAtcAirline,
+            CfgUiManufacturer = request.CfgUiManufacturer,
+            CfgUiType = request.CfgUiType,
+            CfgUiVariation = request.CfgUiVariation,
+            CfgIcaoAirline = request.CfgIcaoAirline,
+            CfgGeneralAtcType = request.CfgGeneralAtcType,
+            CfgGeneralAtcModel = request.CfgGeneralAtcModel,
+            CfgEditable = request.CfgEditable,
+            CfgPerformance = request.CfgPerformance,
+            CfgCategory = request.CfgCategory
         };
 
         _context.AircraftRequests.Add(aircraftRequest);
@@ -232,6 +262,34 @@ public class AircraftRequestsController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("check/{aircraftTitle}")]
+    public async Task<ActionResult<AircraftRequestCheckResponse>> CheckExistingRequest(string aircraftTitle)
+    {
+        // Check if aircraft exists in database
+        var existingAircraft = await _context.Aircraft
+            .FirstOrDefaultAsync(a => a.Title == aircraftTitle);
+
+        if (existingAircraft != null)
+        {
+            return Ok(new AircraftRequestCheckResponse { Status = "exists" });
+        }
+
+        // Check for existing request
+        var existingRequest = await _context.AircraftRequests
+            .FirstOrDefaultAsync(r => r.AircraftTitle == aircraftTitle);
+
+        if (existingRequest == null)
+        {
+            return Ok(new AircraftRequestCheckResponse { Status = "none" });
+        }
+
+        return Ok(new AircraftRequestCheckResponse
+        {
+            Status = existingRequest.Status.ToString().ToLower(),
+            RequestId = existingRequest.Id.ToString()
+        });
+    }
+
     private Guid? GetUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -247,6 +305,9 @@ public class AircraftRequestsController : ControllerBase
 
     private static AircraftRequestResponse ToResponse(AircraftRequest request)
     {
+        var hasFileData = !string.IsNullOrEmpty(request.ManifestJsonRaw) ||
+                          !string.IsNullOrEmpty(request.AircraftCfgRaw);
+
         return new AircraftRequestResponse
         {
             Id = request.Id,
@@ -267,7 +328,44 @@ public class AircraftRequestsController : ControllerBase
                 ? $"{request.RequestedByUser.FirstName} {request.RequestedByUser.LastName}"
                 : null,
             CreatedAt = request.CreatedAt,
-            ReviewedAt = request.ReviewedAt
+            ReviewedAt = request.ReviewedAt,
+            HasFileData = hasFileData,
+            ManifestData = hasFileData && !string.IsNullOrEmpty(request.ManifestJsonRaw)
+                ? new ManifestDataResponse
+                {
+                    ContentType = request.ManifestContentType,
+                    Title = request.ManifestTitle,
+                    Manufacturer = request.ManifestManufacturer,
+                    Creator = request.ManifestCreator,
+                    PackageVersion = request.ManifestPackageVersion,
+                    MinimumGameVersion = request.ManifestMinimumGameVersion,
+                    TotalPackageSize = request.ManifestTotalPackageSize,
+                    ContentId = request.ManifestContentId
+                }
+                : null,
+            AircraftCfgData = hasFileData && !string.IsNullOrEmpty(request.AircraftCfgRaw)
+                ? new AircraftCfgDataResponse
+                {
+                    Title = request.CfgTitle,
+                    Model = request.CfgModel,
+                    Panel = request.CfgPanel,
+                    Sound = request.CfgSound,
+                    Texture = request.CfgTexture,
+                    AtcType = request.CfgAtcType,
+                    AtcModel = request.CfgAtcModel,
+                    AtcId = request.CfgAtcId,
+                    AtcAirline = request.CfgAtcAirline,
+                    UiManufacturer = request.CfgUiManufacturer,
+                    UiType = request.CfgUiType,
+                    UiVariation = request.CfgUiVariation,
+                    IcaoAirline = request.CfgIcaoAirline,
+                    GeneralAtcType = request.CfgGeneralAtcType,
+                    GeneralAtcModel = request.CfgGeneralAtcModel,
+                    Editable = request.CfgEditable,
+                    Performance = request.CfgPerformance,
+                    Category = request.CfgCategory
+                }
+                : null
         };
     }
 }
@@ -285,6 +383,42 @@ public record CreateAircraftRequestRequest
     public double EmptyWeightLbs { get; init; }
     public double CruiseSpeedKts { get; init; }
     public string? SimulatorVersion { get; init; }
+
+    // Raw file contents
+    public string? ManifestJsonRaw { get; init; }
+    public string? AircraftCfgRaw { get; init; }
+
+    // Manifest fields
+    public string? ManifestContentType { get; init; }
+    public string? ManifestTitle { get; init; }
+    public string? ManifestManufacturer { get; init; }
+    public string? ManifestCreator { get; init; }
+    public string? ManifestPackageVersion { get; init; }
+    public string? ManifestMinimumGameVersion { get; init; }
+    public string? ManifestTotalPackageSize { get; init; }
+    public string? ManifestContentId { get; init; }
+
+    // Aircraft.cfg [FLTSIM.0] fields
+    public string? CfgTitle { get; init; }
+    public string? CfgModel { get; init; }
+    public string? CfgPanel { get; init; }
+    public string? CfgSound { get; init; }
+    public string? CfgTexture { get; init; }
+    public string? CfgAtcType { get; init; }
+    public string? CfgAtcModel { get; init; }
+    public string? CfgAtcId { get; init; }
+    public string? CfgAtcAirline { get; init; }
+    public string? CfgUiManufacturer { get; init; }
+    public string? CfgUiType { get; init; }
+    public string? CfgUiVariation { get; init; }
+    public string? CfgIcaoAirline { get; init; }
+
+    // Aircraft.cfg [GENERAL] fields
+    public string? CfgGeneralAtcType { get; init; }
+    public string? CfgGeneralAtcModel { get; init; }
+    public string? CfgEditable { get; init; }
+    public string? CfgPerformance { get; init; }
+    public string? CfgCategory { get; init; }
 }
 
 public record ReviewAircraftRequestRequest
@@ -311,4 +445,52 @@ public record AircraftRequestResponse
     public string? RequestedByUserName { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? ReviewedAt { get; init; }
+
+    // File data
+    public bool HasFileData { get; init; }
+    public ManifestDataResponse? ManifestData { get; init; }
+    public AircraftCfgDataResponse? AircraftCfgData { get; init; }
+}
+
+public record ManifestDataResponse
+{
+    public string? ContentType { get; init; }
+    public string? Title { get; init; }
+    public string? Manufacturer { get; init; }
+    public string? Creator { get; init; }
+    public string? PackageVersion { get; init; }
+    public string? MinimumGameVersion { get; init; }
+    public string? TotalPackageSize { get; init; }
+    public string? ContentId { get; init; }
+}
+
+public record AircraftCfgDataResponse
+{
+    // [FLTSIM.0] section
+    public string? Title { get; init; }
+    public string? Model { get; init; }
+    public string? Panel { get; init; }
+    public string? Sound { get; init; }
+    public string? Texture { get; init; }
+    public string? AtcType { get; init; }
+    public string? AtcModel { get; init; }
+    public string? AtcId { get; init; }
+    public string? AtcAirline { get; init; }
+    public string? UiManufacturer { get; init; }
+    public string? UiType { get; init; }
+    public string? UiVariation { get; init; }
+    public string? IcaoAirline { get; init; }
+
+    // [GENERAL] section
+    public string? GeneralAtcType { get; init; }
+    public string? GeneralAtcModel { get; init; }
+    public string? Editable { get; init; }
+    public string? Performance { get; init; }
+    public string? Category { get; init; }
+}
+
+public record AircraftRequestCheckResponse
+{
+    public required string Status { get; init; }
+    public string? RequestId { get; init; }
 }

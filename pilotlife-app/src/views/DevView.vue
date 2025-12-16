@@ -105,15 +105,33 @@
                 <span class="data-value mono">{{ flightData.timestamp || 'N/A' }}</span>
               </div>
 
+              <!-- Import Status Indicator -->
+              <div v-if="aircraftStatus === 'exists'" class="import-status imported">
+                <span class="status-icon">&#10003;</span>
+                <span>Aircraft Already in Database</span>
+              </div>
+              <div v-else-if="aircraftStatus === 'pending'" class="import-status pending">
+                <span class="status-icon">&#8987;</span>
+                <span>Import Pending Approval</span>
+              </div>
+              <div v-else-if="aircraftStatus === 'approved'" class="import-status approved">
+                <span class="status-icon">&#10003;</span>
+                <span>Import Approved</span>
+              </div>
+              <div v-else-if="aircraftStatus === 'rejected'" class="import-status rejected">
+                <span class="status-icon">&#10007;</span>
+                <span>Import Rejected</span>
+              </div>
               <v-btn
+                v-else
                 color="primary"
                 variant="flat"
                 class="request-btn"
-                :disabled="!flightData || requestingAircraft"
-                :loading="requestingAircraft"
+                :disabled="!flightData || requestingAircraft || checkingStatus"
+                :loading="requestingAircraft || checkingStatus"
                 @click="requestAircraft"
               >
-                Request to Add Aircraft to Sim
+                {{ checkingStatus ? 'Checking Status...' : 'Request to Add Aircraft to Sim' }}
               </v-btn>
               <div v-if="requestMessage" class="request-message" :class="requestMessage.type">
                 {{ requestMessage.text }}
@@ -244,10 +262,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { connector, type FlightData, type SimulatorStatus } from '@/services/connector'
 import { useSettingsStore } from '@/stores/settings'
-import { api } from '@/services/api'
+import { api, type AircraftRequestCheckResponse } from '@/services/api'
 
 const settingsStore = useSettingsStore()
 
@@ -258,6 +276,9 @@ const status = ref<SimulatorStatus | null>(null)
 const flightData = ref<FlightData | null>(null)
 const requestingAircraft = ref(false)
 const requestMessage = ref<{ type: 'success' | 'error', text: string } | null>(null)
+const aircraftStatus = ref<AircraftRequestCheckResponse['status'] | null>(null)
+const checkingStatus = ref(false)
+const lastCheckedAircraft = ref<string | null>(null)
 
 let unsubscribeConnection: (() => void) | null = null
 let unsubscribeStatus: (() => void) | null = null
@@ -284,6 +305,24 @@ function toggleAdminMode(event: Event) {
   settingsStore.setAdminMode(target.checked)
 }
 
+async function checkAircraftStatus(aircraftTitle: string) {
+  if (!aircraftTitle || aircraftTitle === lastCheckedAircraft.value) return
+
+  checkingStatus.value = true
+  try {
+    const response = await api.aircraftRequests.checkExistingRequest(aircraftTitle)
+    if (response.data) {
+      aircraftStatus.value = response.data.status
+      lastCheckedAircraft.value = aircraftTitle
+    }
+  } catch (error) {
+    console.error('Failed to check aircraft status:', error)
+    aircraftStatus.value = null
+  } finally {
+    checkingStatus.value = false
+  }
+}
+
 async function requestAircraft() {
   if (!flightData.value) return
 
@@ -291,7 +330,20 @@ async function requestAircraft() {
   requestMessage.value = null
 
   try {
-    await api.aircraftRequests.create({
+    // Try to get file data from the connector
+    let fileData = null
+    try {
+      if (connector.isRunning()) {
+        fileData = await connector.requestAircraftData(flightData.value.aircraftTitle)
+        console.log('Got aircraft file data:', fileData.found ? 'found' : 'not found')
+      }
+    } catch (fileError) {
+      console.warn('Could not fetch aircraft file data:', fileError)
+      // Continue without file data
+    }
+
+    // Build the request data
+    const requestData: Parameters<typeof api.aircraftRequests.create>[0] = {
       aircraftTitle: flightData.value.aircraftTitle,
       atcType: flightData.value.atcType,
       atcModel: flightData.value.atcModel,
@@ -303,11 +355,59 @@ async function requestAircraft() {
       emptyWeightLbs: flightData.value.emptyWeightLbs,
       cruiseSpeedKts: flightData.value.cruiseSpeedKts,
       simulatorVersion: flightData.value.simulatorVersion
-    })
+    }
 
-    requestMessage.value = {
-      type: 'success',
-      text: 'Aircraft request submitted successfully!'
+    // Add file data if available
+    if (fileData?.found) {
+      if (fileData.manifest) {
+        requestData.manifestJsonRaw = fileData.manifest.rawJson
+        requestData.manifestContentType = fileData.manifest.contentType
+        requestData.manifestTitle = fileData.manifest.title
+        requestData.manifestManufacturer = fileData.manifest.manufacturer
+        requestData.manifestCreator = fileData.manifest.creator
+        requestData.manifestPackageVersion = fileData.manifest.packageVersion
+        requestData.manifestMinimumGameVersion = fileData.manifest.minimumGameVersion
+        requestData.manifestTotalPackageSize = fileData.manifest.totalPackageSize
+        requestData.manifestContentId = fileData.manifest.contentId
+      }
+      if (fileData.aircraftCfg) {
+        requestData.aircraftCfgRaw = fileData.aircraftCfg.rawContent
+        requestData.cfgTitle = fileData.aircraftCfg.title
+        requestData.cfgModel = fileData.aircraftCfg.model
+        requestData.cfgPanel = fileData.aircraftCfg.panel
+        requestData.cfgSound = fileData.aircraftCfg.sound
+        requestData.cfgTexture = fileData.aircraftCfg.texture
+        requestData.cfgAtcType = fileData.aircraftCfg.atcType
+        requestData.cfgAtcModel = fileData.aircraftCfg.atcModel
+        requestData.cfgAtcId = fileData.aircraftCfg.atcId
+        requestData.cfgAtcAirline = fileData.aircraftCfg.atcAirline
+        requestData.cfgUiManufacturer = fileData.aircraftCfg.uiManufacturer
+        requestData.cfgUiType = fileData.aircraftCfg.uiType
+        requestData.cfgUiVariation = fileData.aircraftCfg.uiVariation
+        requestData.cfgIcaoAirline = fileData.aircraftCfg.icaoAirline
+        requestData.cfgGeneralAtcType = fileData.aircraftCfg.generalAtcType
+        requestData.cfgGeneralAtcModel = fileData.aircraftCfg.generalAtcModel
+        requestData.cfgEditable = fileData.aircraftCfg.editable
+        requestData.cfgPerformance = fileData.aircraftCfg.performance
+        requestData.cfgCategory = fileData.aircraftCfg.category
+      }
+    }
+
+    const response = await api.aircraftRequests.create(requestData)
+
+    if (response.error) {
+      requestMessage.value = {
+        type: 'error',
+        text: response.error
+      }
+    } else {
+      requestMessage.value = {
+        type: 'success',
+        text: fileData?.found
+          ? 'Aircraft request submitted with file data!'
+          : 'Aircraft request submitted successfully!'
+      }
+      aircraftStatus.value = 'pending'
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to submit aircraft request'
@@ -324,6 +424,14 @@ async function requestAircraft() {
     }, 5000)
   }
 }
+
+// Watch for aircraft title changes to check status
+watch(() => flightData.value?.aircraftTitle, (newTitle) => {
+  if (newTitle && newTitle !== lastCheckedAircraft.value) {
+    aircraftStatus.value = null
+    checkAircraftStatus(newTitle)
+  }
+})
 
 onMounted(() => {
   port.value = connector.getPort()
@@ -601,6 +709,40 @@ onUnmounted(() => {
 }
 
 .request-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.import-status {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.import-status .status-icon {
+  font-size: 18px;
+}
+
+.import-status.imported,
+.import-status.approved {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.import-status.pending {
+  background: rgba(234, 179, 8, 0.1);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.import-status.rejected {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.3);

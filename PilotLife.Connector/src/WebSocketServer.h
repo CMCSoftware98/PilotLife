@@ -18,6 +18,8 @@
 class WebSocketServer {
 public:
     using ClientConnectedCallback = std::function<void(ix::WebSocket&)>;
+    // Message handler receives the message string and the client WebSocket, returns response to send
+    using MessageHandler = std::function<std::string(const std::string& message, ix::WebSocket& client)>;
 
     explicit WebSocketServer(int port);
     ~WebSocketServer();
@@ -43,10 +45,16 @@ public:
         m_clientConnectedCallback = callback;
     }
 
+    // Set callback for handling incoming messages
+    void setMessageHandler(MessageHandler handler) {
+        m_messageHandler = handler;
+    }
+
 private:
     int m_port;
     ix::WebSocketServer m_server;
     std::atomic<bool> m_running{false};
     mutable std::mutex m_mutex;
     ClientConnectedCallback m_clientConnectedCallback;
+    MessageHandler m_messageHandler;
 };

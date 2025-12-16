@@ -51,4 +51,28 @@ public class MarketplaceConfiguration
     /// How often to log progress (number of airports).
     /// </summary>
     public int ProgressLogInterval { get; set; } = 1000;
+
+    /// <summary>
+    /// Number of parallel batch tasks for marketplace population.
+    /// Defaults to half the processor count for conservative resource usage.
+    /// </summary>
+    public int ParallelBatchCount { get; set; } = Math.Max(1, Environment.ProcessorCount / 2);
+
+    /// <summary>
+    /// If true, only generate marketplace listings for airports within DevCenterRadiusNm of DevCenterAirportIcao.
+    /// Useful for development to limit the scope of marketplace generation.
+    /// </summary>
+    public bool DevModeEnabled { get; set; } = false;
+
+    /// <summary>
+    /// The ICAO code of the center airport for development mode (e.g., "EGLL").
+    /// Only used when DevModeEnabled is true.
+    /// </summary>
+    public string DevCenterAirportIcao { get; set; } = "EGLL";
+
+    /// <summary>
+    /// The radius in nautical miles around the center airport for development mode.
+    /// Only airports within this radius will have marketplace listings generated.
+    /// </summary>
+    public int DevCenterRadiusNm { get; set; } = 200;
 }

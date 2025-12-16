@@ -25,6 +25,40 @@
       </div>
 
       <div class="settings-section">
+        <h2 class="section-title">MSFS Integration</h2>
+        <div class="settings-card">
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">UserCfg.opt Location</span>
+              <span class="setting-value path-value" :class="{ 'not-found': !msfsPaths?.userCfgOptPath }">
+                {{ msfsPaths?.userCfgOptPath || 'Not found' }}
+              </span>
+            </div>
+            <div class="status-indicator" :class="msfsPaths?.userCfgOptPath ? 'found' : 'not-found'">
+              {{ msfsPaths?.userCfgOptPath ? 'Found' : 'Not Found' }}
+            </div>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Community Folder</span>
+              <span class="setting-value path-value" :class="{ 'not-found': !communityFolder }">
+                {{ communityFolder || 'Not found' }}
+              </span>
+            </div>
+            <div class="status-indicator" :class="communityFolder ? 'found' : 'not-found'">
+              {{ communityFolder ? 'Found' : 'Not Found' }}
+            </div>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Indexed Aircraft</span>
+              <span class="setting-value">{{ msfsPaths?.indexedAircraftCount ?? 0 }} variants</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h2 class="section-title">Appearance</h2>
         <div class="settings-card">
           <div class="setting-item">
@@ -85,14 +119,42 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useSettingsStore } from '../stores/settings'
 import { api } from '../services/api'
+import { connector, type MSFSPathsInfo } from '../services/connector'
 
 const router = useRouter()
 const userStore = useUserStore()
 const settingsStore = useSettingsStore()
+
+const msfsPaths = ref<MSFSPathsInfo | null>(null)
+
+// Get the community folder from search paths (the one that ends with \Community)
+const communityFolder = computed(() => {
+  if (!msfsPaths.value?.searchPaths) return null
+  return msfsPaths.value.searchPaths.find(path => path.toLowerCase().endsWith('\\community')) || null
+})
+
+let unsubscribePaths: (() => void) | null = null
+
+onMounted(() => {
+  // Get initial paths info
+  msfsPaths.value = connector.getMSFSPaths()
+
+  // Subscribe to paths updates
+  unsubscribePaths = connector.onMSFSPaths((paths) => {
+    msfsPaths.value = paths
+  })
+})
+
+onUnmounted(() => {
+  if (unsubscribePaths) {
+    unsubscribePaths()
+  }
+})
 
 function toggleDeveloperMode(event: Event) {
   const target = event.target as HTMLInputElement
@@ -183,6 +245,37 @@ async function handleLogout() {
 .setting-value {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.setting-value.path-value {
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.setting-value.not-found {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.status-indicator {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.status-indicator.found {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.status-indicator.not-found {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 }
 
 .setting-description {

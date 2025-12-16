@@ -66,4 +66,33 @@ public class JobGenerationConfiguration
     /// Whether to only generate jobs at airports with runways (exclude heliports, etc.).
     /// </summary>
     public bool OnlyAirportsWithRunways { get; set; } = true;
+
+    /// <summary>
+    /// Maximum degree of parallelism for job generation.
+    /// Defaults to half the processor count for conservative resource usage.
+    /// </summary>
+    public int MaxDegreeOfParallelism { get; set; } = Math.Max(1, Environment.ProcessorCount / 2);
+
+    /// <summary>
+    /// Number of airports to process before saving to database in parallel mode.
+    /// </summary>
+    public int ParallelSaveBatchSize { get; set; } = 50;
+
+    /// <summary>
+    /// If true, only generate jobs for airports within DevCenterRadiusNm of DevCenterAirportIcao.
+    /// Useful for development to limit the scope of job generation.
+    /// </summary>
+    public bool DevModeEnabled { get; set; } = false;
+
+    /// <summary>
+    /// The ICAO code of the center airport for development mode (e.g., "EGLL").
+    /// Only used when DevModeEnabled is true.
+    /// </summary>
+    public string DevCenterAirportIcao { get; set; } = "EGLL";
+
+    /// <summary>
+    /// The radius in nautical miles around the center airport for development mode.
+    /// Only airports within this radius will have jobs generated.
+    /// </summary>
+    public int DevCenterRadiusNm { get; set; } = 200;
 }

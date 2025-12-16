@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using PilotLife.Application.Common;
 using PilotLife.Application.Jobs;
 using PilotLife.Database.Data;
 using PilotLife.Domain.Entities;
@@ -9,13 +11,13 @@ namespace PilotLife.API.Services.Jobs;
 
 /// <summary>
 /// Service for generating cargo and passenger jobs at airports across the world.
+/// Uses parallel processing to utilize multiple CPU cores.
 /// </summary>
 public class JobGenerationService : IJobGenerator
 {
-    private readonly PilotLifeDbContext _context;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JobGenerationService> _logger;
     private readonly JobGenerationConfiguration _config;
-    private readonly Random _random = new();
 
     // Airport type constants
     private const string LargeAirport = "large_airport";
@@ -59,189 +61,274 @@ public class JobGenerationService : IJobGenerator
     };
 
     public JobGenerationService(
-        PilotLifeDbContext context,
+        IServiceScopeFactory scopeFactory,
         ILogger<JobGenerationService> logger,
         IOptions<JobGenerationConfiguration> config)
     {
-        _context = context;
+        _scopeFactory = scopeFactory;
         _logger = logger;
         _config = config.Value;
     }
 
     public async Task PopulateWorldJobsAsync(Guid worldId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Starting job population for world {WorldId}", worldId);
+        _logger.LogInformation(
+            "Starting parallel job population for world {WorldId} with {DOP} workers",
+            worldId, _config.MaxDegreeOfParallelism);
 
-        var world = await _context.Worlds.FindAsync([worldId], cancellationToken);
-        if (world == null)
+        // Pre-load shared read-only data using a temporary scope
+        World? world;
+        List<CargoType> cargoTypes;
+        List<Airport> allAirports;
+        Dictionary<int, int> existingJobCounts;
+
+        using (var scope = _scopeFactory.CreateScope())
         {
-            _logger.LogWarning("World {WorldId} not found", worldId);
-            return;
+            var context = scope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
+
+            world = await context.Worlds.AsNoTracking().FirstOrDefaultAsync(w => w.Id == worldId, cancellationToken);
+            if (world == null)
+            {
+                _logger.LogWarning("World {WorldId} not found", worldId);
+                return;
+            }
+
+            cargoTypes = await context.CargoTypes
+                .AsNoTracking()
+                .Where(c => c.IsActive)
+                .ToListAsync(cancellationToken);
+
+            if (cargoTypes.Count == 0)
+            {
+                _logger.LogWarning("No active cargo types found. Cannot generate jobs.");
+                return;
+            }
+
+            existingJobCounts = await context.Jobs
+                .Where(j => j.WorldId == worldId && j.Status == JobStatus.Available && j.ExpiresAt > DateTimeOffset.UtcNow)
+                .GroupBy(j => j.DepartureAirportId)
+                .ToDictionaryAsync(g => g.Key, g => g.Count(), cancellationToken);
+
+            allAirports = await context.Airports
+                .AsNoTracking()
+                .Where(a => a.Type == LargeAirport || a.Type == MediumAirport || a.Type == SmallAirport)
+                .ToListAsync(cancellationToken);
         }
 
-        // Get active cargo types
-        var cargoTypes = await _context.CargoTypes
-            .Where(c => c.IsActive)
-            .ToListAsync(cancellationToken);
-
-        if (cargoTypes.Count == 0)
+        // In dev mode, filter airports to only those within radius of center airport
+        if (_config.DevModeEnabled)
         {
-            _logger.LogWarning("No active cargo types found. Cannot generate jobs.");
-            return;
+            var centerAirport = allAirports.FirstOrDefault(a => a.Ident == _config.DevCenterAirportIcao);
+            if (centerAirport != null)
+            {
+                allAirports = allAirports
+                    .Where(a => CalculateDistance(centerAirport.Latitude, centerAirport.Longitude, a.Latitude, a.Longitude) <= _config.DevCenterRadiusNm)
+                    .ToList();
+
+                _logger.LogInformation(
+                    "Dev mode: Limited to {Count} airports within {Radius}nm of {Center}",
+                    allAirports.Count, _config.DevCenterRadiusNm, _config.DevCenterAirportIcao);
+            }
+            else
+            {
+                _logger.LogWarning("Dev mode center airport {Icao} not found, processing all airports", _config.DevCenterAirportIcao);
+            }
         }
 
-        // Build a lookup of existing job counts by departure airport
-        var existingJobCounts = await _context.Jobs
-            .Where(j => j.WorldId == worldId && j.Status == JobStatus.Available && j.ExpiresAt > DateTimeOffset.UtcNow)
-            .GroupBy(j => j.DepartureAirportId)
-            .ToDictionaryAsync(g => g.Key, g => g.Count(), cancellationToken);
-
-        // Pre-load all airports for destination selection
-        var allAirports = await _context.Airports
-            .Where(a => a.Type == LargeAirport || a.Type == MediumAirport || a.Type == SmallAirport)
-            .ToListAsync(cancellationToken);
-
-        // Build spatial index for faster destination lookups
+        // Build spatial index (read-only, safe to share across threads)
         var airportsByRegion = BuildAirportSpatialIndex(allAirports);
 
-        // Process airports in batches
         var totalAirports = allAirports.Count;
-        var processed = 0;
+        var processedCount = 0;
         var jobsCreated = 0;
 
-        var batchSize = _config.AirportBatchSize;
+        _logger.LogInformation("Processing {Total} airports in parallel", totalAirports);
 
-        for (var skip = 0; skip < totalAirports; skip += batchSize)
-        {
-            var airportBatch = allAirports.Skip(skip).Take(batchSize).ToList();
-
-            foreach (var airport in airportBatch)
+        // Process airports in parallel
+        await Parallel.ForEachAsync(
+            allAirports,
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = _config.MaxDegreeOfParallelism,
+                CancellationToken = cancellationToken
+            },
+            async (airport, token) =>
             {
                 var targetJobCount = GetTargetJobCount(airport.Type);
                 existingJobCounts.TryGetValue(airport.Id, out var currentCount);
-
                 var jobsNeeded = targetJobCount - currentCount;
 
-                if (jobsNeeded > 0)
+                if (jobsNeeded <= 0)
                 {
-                    var destinations = GetNearbyAirports(airport, airportsByRegion, allAirports);
-                    var jobs = GenerateJobsForAirport(world, airport, destinations, cargoTypes, jobsNeeded);
-
-                    if (jobs.Count > 0)
-                    {
-                        await _context.Jobs.AddRangeAsync(jobs, cancellationToken);
-                        jobsCreated += jobs.Count;
-                    }
+                    Interlocked.Increment(ref processedCount);
+                    return;
                 }
 
-                processed++;
-            }
+                // Each parallel iteration gets its own scope and DbContext
+                using var innerScope = _scopeFactory.CreateScope();
+                var innerContext = innerScope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
 
-            // Save after each batch
-            await _context.SaveChangesAsync(cancellationToken);
+                var destinations = GetNearbyAirports(airport, airportsByRegion, allAirports);
+                var jobs = GenerateJobsForAirport(world, airport, destinations, cargoTypes, jobsNeeded);
 
-            if (processed % _config.ProgressLogInterval == 0)
-            {
-                _logger.LogInformation(
-                    "Job population progress: {Processed}/{Total} airports, {Jobs} jobs created",
-                    processed, totalAirports, jobsCreated);
-            }
-        }
+                if (jobs.Count > 0)
+                {
+                    await innerContext.Jobs.AddRangeAsync(jobs, token);
+                    await innerContext.SaveChangesAsync(token);
+                    Interlocked.Add(ref jobsCreated, jobs.Count);
+                }
+
+                var currentProcessed = Interlocked.Increment(ref processedCount);
+
+                // Log progress more frequently in development (every 100 airports or configured interval)
+                var logInterval = Math.Min(100, _config.ProgressLogInterval);
+                if (currentProcessed % logInterval == 0 || currentProcessed == totalAirports)
+                {
+                    _logger.LogInformation(
+                        "Job population progress: {Processed}/{Total} airports, {Jobs} jobs created",
+                        currentProcessed, totalAirports, jobsCreated);
+                }
+            });
 
         _logger.LogInformation(
-            "Job population complete for world {WorldId}: {Airports} airports, {Jobs} jobs created",
-            worldId, processed, jobsCreated);
+            "=== Job population COMPLETE for world {WorldId}: {Airports} airports processed, {Jobs} jobs created ===",
+            worldId, processedCount, jobsCreated);
     }
 
     public async Task RefreshStaleJobsAsync(Guid worldId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Refreshing stale jobs for world {WorldId}", worldId);
+        _logger.LogInformation(
+            "Refreshing stale jobs for world {WorldId} with {DOP} workers",
+            worldId, _config.MaxDegreeOfParallelism);
 
-        var world = await _context.Worlds.FindAsync([worldId], cancellationToken);
-        if (world == null) return;
+        // Pre-load shared read-only data
+        World? world;
+        List<CargoType> cargoTypes;
+        List<Airport> allAirports;
+        List<(Airport Airport, int JobCount)> airportsNeedingRefresh;
 
-        var cargoTypes = await _context.CargoTypes
-            .Where(c => c.IsActive)
-            .ToListAsync(cancellationToken);
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
 
-        if (cargoTypes.Count == 0) return;
+            world = await context.Worlds.AsNoTracking().FirstOrDefaultAsync(w => w.Id == worldId, cancellationToken);
+            if (world == null) return;
 
-        // Single query to get all airports with their current job counts
-        var airportsWithJobCounts = await _context.Airports
-            .Where(a => a.Type == LargeAirport || a.Type == MediumAirport || a.Type == SmallAirport)
-            .GroupJoin(
-                _context.Jobs.Where(j =>
-                    j.WorldId == worldId &&
-                    j.Status == JobStatus.Available &&
-                    j.ExpiresAt > DateTimeOffset.UtcNow),
-                airport => airport.Id,
-                job => job.DepartureAirportId,
-                (airport, jobs) => new { Airport = airport, JobCount = jobs.Count() })
-            .Where(x => x.JobCount < _config.MinJobsPerAirport)
-            .ToListAsync(cancellationToken);
+            cargoTypes = await context.CargoTypes
+                .AsNoTracking()
+                .Where(c => c.IsActive)
+                .ToListAsync(cancellationToken);
 
-        if (airportsWithJobCounts.Count == 0)
+            if (cargoTypes.Count == 0) return;
+
+            // Single query to get all airports with their current job counts
+            airportsNeedingRefresh = await context.Airports
+                .AsNoTracking()
+                .Where(a => a.Type == LargeAirport || a.Type == MediumAirport || a.Type == SmallAirport)
+                .GroupJoin(
+                    context.Jobs.Where(j =>
+                        j.WorldId == worldId &&
+                        j.Status == JobStatus.Available &&
+                        j.ExpiresAt > DateTimeOffset.UtcNow),
+                    airport => airport.Id,
+                    job => job.DepartureAirportId,
+                    (airport, jobs) => new { Airport = airport, JobCount = jobs.Count() })
+                .Where(x => x.JobCount < _config.MinJobsPerAirport)
+                .Select(x => ValueTuple.Create(x.Airport, x.JobCount))
+                .ToListAsync(cancellationToken);
+
+            allAirports = await context.Airports
+                .AsNoTracking()
+                .Where(a => a.Type == LargeAirport || a.Type == MediumAirport || a.Type == SmallAirport)
+                .ToListAsync(cancellationToken);
+        }
+
+        // In dev mode, filter airports to only those within radius of center airport
+        if (_config.DevModeEnabled)
+        {
+            var centerAirport = allAirports.FirstOrDefault(a => a.Ident == _config.DevCenterAirportIcao);
+            if (centerAirport != null)
+            {
+                var airportIdsInRange = allAirports
+                    .Where(a => CalculateDistance(centerAirport.Latitude, centerAirport.Longitude, a.Latitude, a.Longitude) <= _config.DevCenterRadiusNm)
+                    .Select(a => a.Id)
+                    .ToHashSet();
+
+                allAirports = allAirports.Where(a => airportIdsInRange.Contains(a.Id)).ToList();
+                airportsNeedingRefresh = airportsNeedingRefresh.Where(x => airportIdsInRange.Contains(x.Airport.Id)).ToList();
+
+                _logger.LogInformation(
+                    "Dev mode: Limited to {Count} airports within {Radius}nm of {Center}",
+                    allAirports.Count, _config.DevCenterRadiusNm, _config.DevCenterAirportIcao);
+            }
+        }
+
+        if (airportsNeedingRefresh.Count == 0)
         {
             _logger.LogInformation("No airports need job refresh for world {WorldId}", worldId);
             return;
         }
 
-        _logger.LogInformation("Found {Count} airports needing job refresh", airportsWithJobCounts.Count);
-
-        // Pre-load all airports for destinations
-        var allAirports = await _context.Airports
-            .Where(a => a.Type == LargeAirport || a.Type == MediumAirport || a.Type == SmallAirport)
-            .ToListAsync(cancellationToken);
+        _logger.LogInformation("Found {Count} airports needing job refresh", airportsNeedingRefresh.Count);
 
         var airportsByRegion = BuildAirportSpatialIndex(allAirports);
-
         var jobsCreated = 0;
+        var processedCount = 0;
+        var totalAirports = airportsNeedingRefresh.Count;
 
-        // Process in batches
-        var batchSize = _config.AirportBatchSize;
-        var processed = 0;
-
-        for (var skip = 0; skip < airportsWithJobCounts.Count; skip += batchSize)
-        {
-            var batch = airportsWithJobCounts.Skip(skip).Take(batchSize).ToList();
-
-            foreach (var item in batch)
+        // Process airports in parallel
+        await Parallel.ForEachAsync(
+            airportsNeedingRefresh,
+            new ParallelOptions
             {
-                var targetJobCount = GetTargetJobCount(item.Airport.Type);
-                var jobsNeeded = targetJobCount - item.JobCount;
+                MaxDegreeOfParallelism = _config.MaxDegreeOfParallelism,
+                CancellationToken = cancellationToken
+            },
+            async (item, token) =>
+            {
+                var (airport, jobCount) = item;
+                var targetJobCount = GetTargetJobCount(airport.Type);
+                var jobsNeeded = targetJobCount - jobCount;
 
-                if (jobsNeeded > 0)
+                if (jobsNeeded <= 0)
                 {
-                    var destinations = GetNearbyAirports(item.Airport, airportsByRegion, allAirports);
-                    var jobs = GenerateJobsForAirport(world, item.Airport, destinations, cargoTypes, jobsNeeded);
-
-                    if (jobs.Count > 0)
-                    {
-                        await _context.Jobs.AddRangeAsync(jobs, cancellationToken);
-                        jobsCreated += jobs.Count;
-                    }
+                    Interlocked.Increment(ref processedCount);
+                    return;
                 }
 
-                processed++;
-            }
+                // Each parallel iteration gets its own scope and DbContext
+                using var innerScope = _scopeFactory.CreateScope();
+                var innerContext = innerScope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
 
-            // Save after each batch
-            await _context.SaveChangesAsync(cancellationToken);
+                var destinations = GetNearbyAirports(airport, airportsByRegion, allAirports);
+                var jobs = GenerateJobsForAirport(world, airport, destinations, cargoTypes, jobsNeeded);
 
-            if (processed % _config.ProgressLogInterval == 0)
-            {
-                _logger.LogInformation(
-                    "Job refresh progress: {Processed}/{Total} airports, {Jobs} jobs created",
-                    processed, airportsWithJobCounts.Count, jobsCreated);
-            }
-        }
+                if (jobs.Count > 0)
+                {
+                    await innerContext.Jobs.AddRangeAsync(jobs, token);
+                    await innerContext.SaveChangesAsync(token);
+                    Interlocked.Add(ref jobsCreated, jobs.Count);
+                }
+
+                var currentProcessed = Interlocked.Increment(ref processedCount);
+
+                if (currentProcessed % _config.ProgressLogInterval == 0)
+                {
+                    _logger.LogInformation(
+                        "Job refresh progress: {Processed}/{Total} airports, {Jobs} jobs created",
+                        currentProcessed, totalAirports, jobsCreated);
+                }
+            });
 
         _logger.LogInformation("Refreshed jobs for world {WorldId}: {Jobs} new jobs created", worldId, jobsCreated);
     }
 
     public async Task<int> CleanupExpiredJobsAsync(Guid? worldId = null, CancellationToken cancellationToken = default)
     {
-        var query = _context.Jobs
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
+
+        var query = context.Jobs
             .Where(j => j.Status == JobStatus.Available && j.ExpiresAt <= DateTimeOffset.UtcNow);
 
         if (worldId.HasValue)
@@ -257,7 +344,7 @@ public class JobGenerationService : IJobGenerator
             {
                 job.Status = JobStatus.Expired;
             }
-            await _context.SaveChangesAsync(cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Marked {Count} jobs as expired", expiredJobs.Count);
         }
 
@@ -275,7 +362,7 @@ public class JobGenerationService : IJobGenerator
         };
     }
 
-    private Dictionary<(int latBucket, int lonBucket), List<Airport>> BuildAirportSpatialIndex(List<Airport> airports)
+    private static Dictionary<(int latBucket, int lonBucket), List<Airport>> BuildAirportSpatialIndex(List<Airport> airports)
     {
         // Bucket airports into 10-degree grid cells for faster nearby lookups
         var index = new Dictionary<(int, int), List<Airport>>();
@@ -319,7 +406,7 @@ public class JobGenerationService : IJobGenerator
             }
         }
 
-        // Filter by actual distance and shuffle
+        // Filter by actual distance and shuffle using thread-safe random
         return candidates
             .Where(a => a.Id != departure.Id)
             .Select(a => new
@@ -328,7 +415,7 @@ public class JobGenerationService : IJobGenerator
                 Distance = CalculateDistance(departure.Latitude, departure.Longitude, a.Latitude, a.Longitude)
             })
             .Where(x => x.Distance >= _config.MinRouteDistanceNm && x.Distance <= _config.MaxRouteDistanceNm)
-            .OrderBy(_ => _random.Next())
+            .OrderBy(_ => ThreadSafeRandom.Next(int.MaxValue))
             .Take(100)
             .Select(x => x.Airport)
             .ToList();
@@ -345,9 +432,12 @@ public class JobGenerationService : IJobGenerator
 
         if (destinations.Count == 0) return jobs;
 
+        // Use thread-safe random for this generation
+        var random = ThreadSafeRandom.Instance;
+
         for (int i = 0; i < count; i++)
         {
-            var destination = destinations[_random.Next(destinations.Count)];
+            var destination = destinations[random.Next(destinations.Count)];
             var distance = CalculateDistance(
                 departure.Latitude, departure.Longitude,
                 destination.Latitude, destination.Longitude);
@@ -357,16 +447,16 @@ public class JobGenerationService : IJobGenerator
                 continue;
 
             // Decide job type based on config
-            bool isCargoJob = _random.NextDouble() < _config.CargoJobPercentage;
+            bool isCargoJob = random.NextDouble() < _config.CargoJobPercentage;
 
             Job? job;
             if (isCargoJob)
             {
-                job = GenerateCargoJob(world, departure, destination, distance, cargoTypes);
+                job = GenerateCargoJob(world, departure, destination, distance, cargoTypes, random);
             }
             else
             {
-                job = GeneratePassengerJob(world, departure, destination, distance);
+                job = GeneratePassengerJob(world, departure, destination, distance, random);
             }
 
             if (job != null)
@@ -379,18 +469,18 @@ public class JobGenerationService : IJobGenerator
     }
 
     private Job GenerateCargoJob(World world, Airport departure, Airport destination,
-        double distance, List<CargoType> cargoTypes)
+        double distance, List<CargoType> cargoTypes, Random random)
     {
-        var cargoType = cargoTypes[_random.Next(cargoTypes.Count)];
+        var cargoType = cargoTypes[random.Next(cargoTypes.Count)];
 
-        int weight = _random.Next(cargoType.MinWeightLbs, cargoType.MaxWeightLbs + 1);
+        int weight = random.Next(cargoType.MinWeightLbs, cargoType.MaxWeightLbs + 1);
         weight = (weight / 10) * 10; // Round to nearest 10 lbs
         weight = Math.Max(weight, cargoType.MinWeightLbs);
 
-        var urgency = PickUrgency(cargoType.IsTimeCritical);
+        var urgency = PickUrgency(cargoType.IsTimeCritical, random);
         var basePayout = CalculateCargoBasePayout(distance, weight, cargoType);
         var finalPayout = ApplyMultipliers(basePayout, urgency, world.JobPayoutMultiplier);
-        var expiryHours = CalculateExpiryHours(urgency, world.JobExpiryMultiplier);
+        var expiryHours = CalculateExpiryHours(urgency, world.JobExpiryMultiplier, random);
         var expiresAt = DateTimeOffset.UtcNow.AddHours(expiryHours);
         int estimatedMinutes = EstimateFlightTime(distance);
         int riskLevel = cargoType.IsIllegal ? (cargoType.IllegalRiskLevel ?? 3) : 1;
@@ -424,24 +514,24 @@ public class JobGenerationService : IJobGenerator
         };
     }
 
-    private Job GeneratePassengerJob(World world, Airport departure, Airport destination, double distance)
+    private Job GeneratePassengerJob(World world, Airport departure, Airport destination, double distance, Random random)
     {
-        var passengerClass = PickPassengerClass();
+        var passengerClass = PickPassengerClass(random);
 
         int passengerCount = passengerClass switch
         {
-            PassengerClass.Economy => _random.Next(1, 20),
-            PassengerClass.Business => _random.Next(1, 10),
-            PassengerClass.First => _random.Next(1, 6),
-            PassengerClass.Charter => _random.Next(2, 12),
-            PassengerClass.Vip => _random.Next(1, 4),
-            _ => _random.Next(1, 10)
+            PassengerClass.Economy => random.Next(1, 20),
+            PassengerClass.Business => random.Next(1, 10),
+            PassengerClass.First => random.Next(1, 6),
+            PassengerClass.Charter => random.Next(2, 12),
+            PassengerClass.Vip => random.Next(1, 4),
+            _ => random.Next(1, 10)
         };
 
-        var urgency = PickUrgency(passengerClass == PassengerClass.Vip || passengerClass == PassengerClass.Charter);
+        var urgency = PickUrgency(passengerClass == PassengerClass.Vip || passengerClass == PassengerClass.Charter, random);
         var basePayout = CalculatePassengerBasePayout(distance, passengerCount, passengerClass);
         var finalPayout = ApplyMultipliers(basePayout, urgency, world.JobPayoutMultiplier);
-        var expiryHours = CalculateExpiryHours(urgency, world.JobExpiryMultiplier);
+        var expiryHours = CalculateExpiryHours(urgency, world.JobExpiryMultiplier, random);
         var expiresAt = DateTimeOffset.UtcNow.AddHours(expiryHours);
         int estimatedMinutes = EstimateFlightTime(distance);
 
@@ -474,7 +564,7 @@ public class JobGenerationService : IJobGenerator
         };
     }
 
-    private decimal CalculateCargoBasePayout(double distance, int weight, CargoType cargoType)
+    private static decimal CalculateCargoBasePayout(double distance, int weight, CargoType cargoType)
     {
         var distanceRate = GetDistanceRate(distance);
         var distancePayout = (decimal)distance * distanceRate;
@@ -485,7 +575,7 @@ public class JobGenerationService : IJobGenerator
         return Math.Round(basePayout, 2);
     }
 
-    private decimal CalculatePassengerBasePayout(double distance, int passengerCount, PassengerClass passengerClass)
+    private static decimal CalculatePassengerBasePayout(double distance, int passengerCount, PassengerClass passengerClass)
     {
         var ratePerNm = PassengerRatesPerNm[passengerClass];
         var basePayout = (decimal)distance * ratePerNm * passengerCount;
@@ -523,10 +613,10 @@ public class JobGenerationService : IJobGenerator
         return Math.Round(finalPayout, 2);
     }
 
-    private double CalculateExpiryHours(JobUrgency urgency, decimal worldExpiryMultiplier)
+    private static double CalculateExpiryHours(JobUrgency urgency, decimal worldExpiryMultiplier, Random random)
     {
         var (min, max) = UrgencyExpiryHours[urgency];
-        var baseHours = _random.Next(min, max + 1);
+        var baseHours = random.Next(min, max + 1);
         return baseHours * (double)worldExpiryMultiplier;
     }
 
@@ -543,9 +633,9 @@ public class JobGenerationService : IJobGenerator
         return (int)Math.Ceiling((distance / avgSpeed) * 60);
     }
 
-    private JobUrgency PickUrgency(bool preferUrgent)
+    private static JobUrgency PickUrgency(bool preferUrgent, Random random)
     {
-        var roll = _random.NextDouble();
+        var roll = random.NextDouble();
 
         if (preferUrgent)
         {
@@ -571,9 +661,9 @@ public class JobGenerationService : IJobGenerator
         }
     }
 
-    private PassengerClass PickPassengerClass()
+    private static PassengerClass PickPassengerClass(Random random)
     {
-        var roll = _random.NextDouble();
+        var roll = random.NextDouble();
         return roll switch
         {
             < 0.50 => PassengerClass.Economy,

@@ -51,77 +51,253 @@
             v-for="request in filteredRequests"
             :key="request.id"
             class="request-card"
-            :class="request.status.toLowerCase()"
+            :class="[request.status.toLowerCase(), { expanded: expandedCards[request.id] }]"
           >
-            <div class="request-header">
-              <h3 class="request-title">{{ request.aircraftTitle }}</h3>
-              <span class="status-badge" :class="request.status.toLowerCase()">
-                {{ request.status }}
-              </span>
-            </div>
-
-            <div class="request-details">
-              <div class="detail-row">
-                <span class="detail-label">Type:</span>
-                <span class="detail-value">{{ request.atcType || 'N/A' }}</span>
+            <div class="request-header" @click="toggleCard(request.id)">
+              <div class="header-left">
+                <span class="expand-icon">{{ expandedCards[request.id] ? '&#9660;' : '&#9654;' }}</span>
+                <h3 class="request-title">{{ request.aircraftTitle }}</h3>
               </div>
-              <div class="detail-row">
-                <span class="detail-label">Model:</span>
-                <span class="detail-value">{{ request.atcModel || 'N/A' }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Category:</span>
-                <span class="detail-value">{{ request.category || 'N/A' }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Engine:</span>
-                <span class="detail-value">{{ request.engineTypeStr }} ({{ request.numberOfEngines }})</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Max Weight:</span>
-                <span class="detail-value">{{ formatNumber(request.maxGrossWeightLbs) }} lbs</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Cruise Speed:</span>
-                <span class="detail-value">{{ formatNumber(request.cruiseSpeedKts) }} kts</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Sim Version:</span>
-                <span class="detail-value">{{ request.simulatorVersion || 'N/A' }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Requested By:</span>
-                <span class="detail-value">{{ request.requestedByUserName || 'Unknown' }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Created:</span>
-                <span class="detail-value">{{ formatDate(request.createdAt) }}</span>
-              </div>
-              <div v-if="request.reviewNotes" class="detail-row notes">
-                <span class="detail-label">Notes:</span>
-                <span class="detail-value">{{ request.reviewNotes }}</span>
+              <div class="header-right">
+                <span v-if="request.hasFileData" class="file-data-badge">Has File Data</span>
+                <span class="status-badge" :class="request.status.toLowerCase()">
+                  {{ request.status }}
+                </span>
               </div>
             </div>
 
-            <div v-if="request.status === 'Pending'" class="request-actions">
-              <v-btn
-                color="success"
-                variant="flat"
-                size="small"
-                :loading="processingId === request.id"
-                @click="approveRequest(request)"
-              >
-                Approve
-              </v-btn>
-              <v-btn
-                color="error"
-                variant="outlined"
-                size="small"
-                :loading="processingId === request.id"
-                @click="rejectRequest(request)"
-              >
-                Reject
-              </v-btn>
+            <!-- Expanded Content -->
+            <div v-if="expandedCards[request.id]" class="request-expanded">
+              <!-- Inner Tabs -->
+              <div class="inner-tabs">
+                <button
+                  class="inner-tab"
+                  :class="{ active: cardTabs[request.id] === 'info' || !cardTabs[request.id] }"
+                  @click.stop="setCardTab(request.id, 'info')"
+                >
+                  Submission Info
+                </button>
+                <button
+                  class="inner-tab"
+                  :class="{ active: cardTabs[request.id] === 'manifest', disabled: !request.manifestData }"
+                  :disabled="!request.manifestData"
+                  @click.stop="setCardTab(request.id, 'manifest')"
+                >
+                  Manifest.json
+                </button>
+                <button
+                  class="inner-tab"
+                  :class="{ active: cardTabs[request.id] === 'aircraft', disabled: !request.aircraftCfgData }"
+                  :disabled="!request.aircraftCfgData"
+                  @click.stop="setCardTab(request.id, 'aircraft')"
+                >
+                  Aircraft.cfg
+                </button>
+              </div>
+
+              <!-- Submission Info Tab -->
+              <div v-if="cardTabs[request.id] === 'info' || !cardTabs[request.id]" class="tab-panel">
+                <div class="request-details">
+                  <div class="detail-row">
+                    <span class="detail-label">Type:</span>
+                    <span class="detail-value">{{ request.atcType || 'N/A' }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Model:</span>
+                    <span class="detail-value">{{ request.atcModel || 'N/A' }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Category:</span>
+                    <span class="detail-value">{{ request.category || 'N/A' }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Engine:</span>
+                    <span class="detail-value">{{ request.engineTypeStr }} ({{ request.numberOfEngines }})</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Max Weight:</span>
+                    <span class="detail-value">{{ formatNumber(request.maxGrossWeightLbs) }} lbs</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Empty Weight:</span>
+                    <span class="detail-value">{{ formatNumber(request.emptyWeightLbs) }} lbs</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Cruise Speed:</span>
+                    <span class="detail-value">{{ formatNumber(request.cruiseSpeedKts) }} kts</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Sim Version:</span>
+                    <span class="detail-value">{{ request.simulatorVersion || 'N/A' }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Requested By:</span>
+                    <span class="detail-value">{{ request.requestedByUserName || 'Unknown' }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Created:</span>
+                    <span class="detail-value">{{ formatDate(request.createdAt) }}</span>
+                  </div>
+                  <div v-if="request.reviewNotes" class="detail-row notes">
+                    <span class="detail-label">Notes:</span>
+                    <span class="detail-value">{{ request.reviewNotes }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Manifest.json Tab -->
+              <div v-if="cardTabs[request.id] === 'manifest'" class="tab-panel">
+                <div v-if="request.manifestData" class="file-data">
+                  <div class="file-data-section">
+                    <h4 class="section-header">Package Information</h4>
+                    <div class="detail-row">
+                      <span class="detail-label">Content Type:</span>
+                      <span class="detail-value">{{ request.manifestData.contentType || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Title:</span>
+                      <span class="detail-value">{{ request.manifestData.title || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Manufacturer:</span>
+                      <span class="detail-value">{{ request.manifestData.manufacturer || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Creator:</span>
+                      <span class="detail-value">{{ request.manifestData.creator || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Package Version:</span>
+                      <span class="detail-value">{{ request.manifestData.packageVersion || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Min Game Version:</span>
+                      <span class="detail-value">{{ request.manifestData.minimumGameVersion || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Package Size:</span>
+                      <span class="detail-value">{{ request.manifestData.totalPackageSize || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Content ID:</span>
+                      <span class="detail-value mono">{{ request.manifestData.contentId || 'N/A' }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="no-data">
+                  No manifest data available
+                </div>
+              </div>
+
+              <!-- Aircraft.cfg Tab -->
+              <div v-if="cardTabs[request.id] === 'aircraft'" class="tab-panel">
+                <div v-if="request.aircraftCfgData" class="file-data">
+                  <div class="file-data-section">
+                    <h4 class="section-header">[FLTSIM.0] Section</h4>
+                    <div class="detail-row">
+                      <span class="detail-label">Title:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.title || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Model:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.model || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Panel:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.panel || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Sound:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.sound || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Texture:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.texture || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">ATC Type:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.atcType || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">ATC Model:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.atcModel || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">ATC ID:</span>
+                      <span class="detail-value mono">{{ request.aircraftCfgData.atcId || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">ATC Airline:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.atcAirline || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">UI Manufacturer:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.uiManufacturer || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">UI Type:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.uiType || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">UI Variation:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.uiVariation || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">ICAO Airline:</span>
+                      <span class="detail-value mono">{{ request.aircraftCfgData.icaoAirline || 'N/A' }}</span>
+                    </div>
+                  </div>
+
+                  <div class="file-data-section">
+                    <h4 class="section-header">[GENERAL] Section</h4>
+                    <div class="detail-row">
+                      <span class="detail-label">ATC Type:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.generalAtcType || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">ATC Model:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.generalAtcModel || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Editable:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.editable || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Performance:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.performance || 'N/A' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Category:</span>
+                      <span class="detail-value">{{ request.aircraftCfgData.category || 'N/A' }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="no-data">
+                  No aircraft.cfg data available
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div v-if="request.status === 'Pending'" class="request-actions">
+                <v-btn
+                  color="success"
+                  variant="flat"
+                  size="small"
+                  :loading="processingId === request.id"
+                  @click.stop="approveRequest(request)"
+                >
+                  Approve
+                </v-btn>
+                <v-btn
+                  color="error"
+                  variant="outlined"
+                  size="small"
+                  :loading="processingId === request.id"
+                  @click.stop="rejectRequest(request)"
+                >
+                  Reject
+                </v-btn>
+              </div>
             </div>
           </div>
         </div>
@@ -191,7 +367,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { api, type AircraftRequestResponse, type AircraftResponse } from '@/services/api'
 
 const activeTab = ref<'requests' | 'aircraft'>('requests')
@@ -203,6 +379,22 @@ const deletingId = ref<string | null>(null)
 
 const requests = ref<AircraftRequestResponse[]>([])
 const aircraft = ref<AircraftResponse[]>([])
+
+// Expandable cards state
+const expandedCards = reactive<Record<string, boolean>>({})
+const cardTabs = reactive<Record<string, 'info' | 'manifest' | 'aircraft'>>({})
+
+function toggleCard(id: string) {
+  expandedCards[id] = !expandedCards[id]
+  // Set default tab when expanding
+  if (expandedCards[id] && !cardTabs[id]) {
+    cardTabs[id] = 'info'
+  }
+}
+
+function setCardTab(id: string, tab: 'info' | 'manifest' | 'aircraft') {
+  cardTabs[id] = tab
+}
 
 const filteredRequests = computed(() => {
   if (!statusFilter.value) return requests.value
@@ -448,16 +640,54 @@ onMounted(() => {
 .request-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: opacity 0.2s ease;
+}
+
+.request-header:hover {
+  opacity: 0.8;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.expand-icon {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.request-card.expanded .expand-icon {
+  color: var(--accent-primary);
 }
 
 .request-title {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
-  flex: 1;
-  margin-right: 12px;
+}
+
+.file-data-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .status-badge {
@@ -592,5 +822,92 @@ onMounted(() => {
 .action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Expandable card content */
+.request-expanded {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.inner-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.inner-tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.inner-tab:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.inner-tab.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-primary);
+}
+
+.inner-tab.disabled,
+.inner-tab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tab-panel {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.file-data {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.file-data-section {
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.section-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.detail-value.mono {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+}
+
+.no-data {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
 }
 </style>

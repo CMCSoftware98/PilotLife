@@ -1,5 +1,8 @@
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using PilotLife.Application.Common;
 using PilotLife.Application.Marketplace;
 using PilotLife.Database.Data;
 using PilotLife.Domain.Entities;
@@ -9,13 +12,13 @@ namespace PilotLife.API.Services;
 
 /// <summary>
 /// Generates and populates marketplace dealers and inventory based on airport size.
+/// Uses parallel batch processing to utilize multiple CPU cores.
 /// </summary>
 public class MarketplaceGenerator : IMarketplaceGenerator
 {
-    private readonly PilotLifeDbContext _context;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MarketplaceGenerator> _logger;
     private readonly MarketplaceConfiguration _config;
-    private readonly Random _random = new();
 
     // Airport type constants from the CSV
     private const string LargeAirport = "large_airport";
@@ -35,158 +38,321 @@ public class MarketplaceGenerator : IMarketplaceGenerator
     };
 
     public MarketplaceGenerator(
-        PilotLifeDbContext context,
+        IServiceScopeFactory scopeFactory,
         ILogger<MarketplaceGenerator> logger,
         IOptions<MarketplaceConfiguration> config)
     {
-        _context = context;
+        _scopeFactory = scopeFactory;
         _logger = logger;
         _config = config.Value;
     }
 
     public async Task PopulateWorldMarketplaceAsync(Guid worldId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Starting marketplace population for world {WorldId}", worldId);
+        _logger.LogInformation(
+            "Starting parallel marketplace population for world {WorldId} with {BatchCount} parallel batches",
+            worldId, _config.ParallelBatchCount);
 
-        var world = await _context.Worlds.FindAsync([worldId], cancellationToken);
-        if (world == null)
+        // Pre-load shared read-only data using a temporary scope
+        World? world;
+        List<Aircraft> availableAircraft;
+        List<Airport> allAirports;
+        Dictionary<string, List<AircraftDealer>> existingDealersByAirport;
+
+        using (var scope = _scopeFactory.CreateScope())
         {
-            _logger.LogWarning("World {WorldId} not found", worldId);
-            return;
-        }
+            var context = scope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
 
-        // Get all approved aircraft
-        var availableAircraft = await _context.Aircraft
-            .Where(a => a.IsApproved)
-            .ToListAsync(cancellationToken);
+            world = await context.Worlds.AsNoTracking().FirstOrDefaultAsync(w => w.Id == worldId, cancellationToken);
+            if (world == null)
+            {
+                _logger.LogWarning("World {WorldId} not found", worldId);
+                return;
+            }
 
-        if (availableAircraft.Count == 0)
-        {
-            _logger.LogWarning("No approved aircraft found in database");
-            return;
-        }
-
-        // Get existing dealers for this world
-        var existingDealersByAirport = await _context.AircraftDealers
-            .Where(d => d.WorldId == worldId)
-            .GroupBy(d => d.AirportIcao)
-            .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken);
-
-        // Process airports in batches
-        var totalAirports = await _context.Airports.CountAsync(cancellationToken);
-        var processed = 0;
-        var dealersCreated = 0;
-        var inventoryCreated = 0;
-
-        var batchSize = _config.AirportBatchSize;
-
-        for (var skip = 0; skip < totalAirports; skip += batchSize)
-        {
-            var airports = await _context.Airports
-                .OrderBy(a => a.Id)
-                .Skip(skip)
-                .Take(batchSize)
+            availableAircraft = await context.Aircraft
+                .AsNoTracking()
+                .Where(a => a.IsApproved)
                 .ToListAsync(cancellationToken);
 
-            foreach (var airport in airports)
+            if (availableAircraft.Count == 0)
             {
-                var dealerTypes = GetDealerTypesForAirport(airport.Type);
-                var targetDealerCount = GetTargetDealerCount(airport.Type);
-
-                // Get or create dealers for this airport
-                existingDealersByAirport.TryGetValue(airport.Ident, out var existingDealers);
-                existingDealers ??= [];
-
-                // Create missing dealer types
-                var existingTypes = existingDealers.Select(d => d.DealerType).ToHashSet();
-                var dealersToCreate = new List<AircraftDealer>();
-
-                foreach (var dealerType in dealerTypes.Take(targetDealerCount))
-                {
-                    if (!existingTypes.Contains(dealerType))
-                    {
-                        var dealer = CreateDealer(worldId, airport, dealerType);
-                        dealersToCreate.Add(dealer);
-                        dealersCreated++;
-                    }
-                }
-
-                if (dealersToCreate.Count > 0)
-                {
-                    await _context.AircraftDealers.AddRangeAsync(dealersToCreate, cancellationToken);
-                    existingDealers.AddRange(dealersToCreate);
-                }
-
-                // Generate inventory for dealers that need it
-                foreach (var dealer in existingDealers)
-                {
-                    if (ShouldRefreshInventory(dealer))
-                    {
-                        var inventoryCount = await GenerateInventoryForDealerAsync(
-                            dealer, availableAircraft, cancellationToken);
-                        inventoryCreated += inventoryCount;
-                    }
-                }
-
-                processed++;
+                _logger.LogWarning("No approved aircraft found in database");
+                return;
             }
 
-            // Save after each batch
-            await _context.SaveChangesAsync(cancellationToken);
+            // Load all airports at once
+            allAirports = await context.Airports
+                .AsNoTracking()
+                .OrderBy(a => a.Id)
+                .ToListAsync(cancellationToken);
 
-            if (processed % _config.ProgressLogInterval == 0)
+            // Apply DevMode filtering if enabled
+            if (_config.DevModeEnabled)
             {
-                _logger.LogInformation(
-                    "Marketplace population progress: {Processed}/{Total} airports, {Dealers} dealers, {Inventory} inventory",
-                    processed, totalAirports, dealersCreated, inventoryCreated);
+                var centerAirport = allAirports.FirstOrDefault(a => a.Ident == _config.DevCenterAirportIcao);
+                if (centerAirport != null)
+                {
+                    allAirports = allAirports
+                        .Where(a => CalculateDistance(centerAirport.Latitude, centerAirport.Longitude,
+                            a.Latitude, a.Longitude) <= _config.DevCenterRadiusNm)
+                        .ToList();
+                    _logger.LogInformation(
+                        "Dev mode: Limited marketplace to {Count} airports within {Radius}nm of {Center}",
+                        allAirports.Count, _config.DevCenterRadiusNm, _config.DevCenterAirportIcao);
+                }
+                else
+                {
+                    _logger.LogWarning("Dev mode center airport {Icao} not found, processing all airports",
+                        _config.DevCenterAirportIcao);
+                }
             }
+
+            existingDealersByAirport = await context.AircraftDealers
+                .AsNoTracking()
+                .Where(d => d.WorldId == worldId)
+                .GroupBy(d => d.AirportIcao)
+                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken);
         }
+
+        var totalAirports = allAirports.Count;
+        _logger.LogInformation("Processing {Total} airports in parallel batches", totalAirports);
+
+        // Split airports into batches for parallel processing
+        var batchCount = _config.ParallelBatchCount;
+        var batchSize = (totalAirports + batchCount - 1) / batchCount; // Ceiling division
+        var batches = allAirports.Chunk(batchSize).ToList();
+
+        // Results collection
+        var results = new ConcurrentBag<BatchResult>();
+
+        // Process batches in parallel
+        var tasks = batches.Select((batch, index) =>
+            ProcessBatchAsync(
+                index,
+                batch,
+                worldId,
+                availableAircraft,
+                existingDealersByAirport,
+                results,
+                cancellationToken));
+
+        await Task.WhenAll(tasks);
+
+        // Aggregate results
+        var totalProcessed = results.Sum(r => r.AirportsProcessed);
+        var totalDealersCreated = results.Sum(r => r.DealersCreated);
+        var totalInventoryCreated = results.Sum(r => r.InventoryCreated);
 
         _logger.LogInformation(
             "Marketplace population complete for world {WorldId}: {Airports} airports, {Dealers} dealers, {Inventory} inventory items",
-            worldId, processed, dealersCreated, inventoryCreated);
+            worldId, totalProcessed, totalDealersCreated, totalInventoryCreated);
+    }
+
+    private async Task ProcessBatchAsync(
+        int batchIndex,
+        Airport[] airports,
+        Guid worldId,
+        List<Aircraft> availableAircraft,
+        Dictionary<string, List<AircraftDealer>> existingDealersByAirport,
+        ConcurrentBag<BatchResult> results,
+        CancellationToken cancellationToken)
+    {
+        var result = new BatchResult { BatchIndex = batchIndex };
+
+        // Each batch gets its own Random instance with unique seed
+        var random = new Random(Environment.TickCount ^ batchIndex);
+
+        // Create a scope and DbContext for this batch
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
+
+        var saveCounter = 0;
+        const int saveInterval = 100;
+
+        foreach (var airport in airports)
+        {
+            var dealerTypes = GetDealerTypesForAirport(airport.Type);
+            var targetDealerCount = GetTargetDealerCount(airport.Type);
+
+            // Get existing dealers for this airport (from pre-loaded data)
+            existingDealersByAirport.TryGetValue(airport.Ident, out var existingDealersSnapshot);
+            var existingTypes = existingDealersSnapshot?.Select(d => d.DealerType).ToHashSet() ?? [];
+
+            // Track dealers created in this batch for this airport
+            var dealersCreatedForAirport = new List<AircraftDealer>();
+
+            // Create missing dealer types
+            foreach (var dealerType in dealerTypes.Take(targetDealerCount))
+            {
+                if (!existingTypes.Contains(dealerType))
+                {
+                    var dealer = CreateDealer(worldId, airport, dealerType, random);
+                    context.AircraftDealers.Add(dealer);
+                    dealersCreatedForAirport.Add(dealer);
+                    existingTypes.Add(dealerType);
+                    result.DealersCreated++;
+                }
+            }
+
+            // Save to get dealer IDs before generating inventory
+            if (dealersCreatedForAirport.Count > 0)
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+
+            // Generate inventory for newly created dealers
+            foreach (var dealer in dealersCreatedForAirport)
+            {
+                var inventoryCount = GenerateInventoryForDealer(dealer, availableAircraft, context, random);
+                result.InventoryCreated += inventoryCount;
+            }
+
+            result.AirportsProcessed++;
+            saveCounter++;
+
+            // Periodic saves within batch
+            if (saveCounter >= saveInterval)
+            {
+                await context.SaveChangesAsync(cancellationToken);
+                saveCounter = 0;
+
+                // Log progress
+                _logger.LogDebug(
+                    "Batch {Index} progress: {Processed} airports, {Dealers} dealers, {Inventory} inventory",
+                    batchIndex, result.AirportsProcessed, result.DealersCreated, result.InventoryCreated);
+            }
+        }
+
+        // Final save for this batch
+        await context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Batch {Index} complete: {Processed} airports, {Dealers} dealers, {Inventory} inventory",
+            batchIndex, result.AirportsProcessed, result.DealersCreated, result.InventoryCreated);
+
+        results.Add(result);
     }
 
     public async Task RefreshStaleInventoryAsync(Guid worldId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Refreshing stale inventory for world {WorldId}", worldId);
+        _logger.LogInformation(
+            "Refreshing stale inventory for world {WorldId} with {BatchCount} parallel batches",
+            worldId, _config.ParallelBatchCount);
 
-        var availableAircraft = await _context.Aircraft
-            .Where(a => a.IsApproved)
-            .ToListAsync(cancellationToken);
+        // Pre-load shared read-only data
+        List<Aircraft> availableAircraft;
+        List<AircraftDealer> staleDealers;
 
-        if (availableAircraft.Count == 0) return;
-
-        var refreshThreshold = DateTimeOffset.UtcNow.AddDays(-_config.InventoryExpirationDays);
-
-        // Get dealers needing refresh
-        var staleDealers = await _context.AircraftDealers
-            .Where(d => d.WorldId == worldId &&
-                        d.IsActive &&
-                        d.LastInventoryRefresh < refreshThreshold)
-            .Include(d => d.Inventory.Where(i => !i.IsSold))
-            .ToListAsync(cancellationToken);
-
-        var refreshed = 0;
-        var inventoryCreated = 0;
-
-        foreach (var dealer in staleDealers)
+        using (var scope = _scopeFactory.CreateScope())
         {
-            var count = await GenerateInventoryForDealerAsync(dealer, availableAircraft, cancellationToken);
-            inventoryCreated += count;
-            refreshed++;
+            var context = scope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
 
-            if (refreshed % 100 == 0)
-            {
-                await _context.SaveChangesAsync(cancellationToken);
-            }
+            availableAircraft = await context.Aircraft
+                .AsNoTracking()
+                .Where(a => a.IsApproved)
+                .ToListAsync(cancellationToken);
+
+            if (availableAircraft.Count == 0) return;
+
+            var refreshThreshold = DateTimeOffset.UtcNow.AddDays(-_config.InventoryExpirationDays);
+
+            staleDealers = await context.AircraftDealers
+                .AsNoTracking()
+                .Where(d => d.WorldId == worldId &&
+                            d.IsActive &&
+                            d.LastInventoryRefresh < refreshThreshold)
+                .ToListAsync(cancellationToken);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        if (staleDealers.Count == 0)
+        {
+            _logger.LogInformation("No dealers need inventory refresh for world {WorldId}", worldId);
+            return;
+        }
+
+        _logger.LogInformation("Found {Count} dealers needing inventory refresh", staleDealers.Count);
+
+        // Split dealers into batches
+        var batchCount = _config.ParallelBatchCount;
+        var batchSize = (staleDealers.Count + batchCount - 1) / batchCount;
+        var batches = staleDealers.Chunk(batchSize).ToList();
+
+        var results = new ConcurrentBag<RefreshResult>();
+
+        var tasks = batches.Select((batch, index) =>
+            RefreshDealerBatchAsync(
+                index,
+                batch,
+                availableAircraft,
+                results,
+                cancellationToken));
+
+        await Task.WhenAll(tasks);
+
+        var totalRefreshed = results.Sum(r => r.DealersRefreshed);
+        var totalInventory = results.Sum(r => r.InventoryCreated);
 
         _logger.LogInformation(
             "Refreshed {Dealers} dealers with {Inventory} new inventory items for world {WorldId}",
-            refreshed, inventoryCreated, worldId);
+            totalRefreshed, totalInventory, worldId);
+    }
+
+    private async Task RefreshDealerBatchAsync(
+        int batchIndex,
+        AircraftDealer[] dealers,
+        List<Aircraft> availableAircraft,
+        ConcurrentBag<RefreshResult> results,
+        CancellationToken cancellationToken)
+    {
+        var result = new RefreshResult { BatchIndex = batchIndex };
+        var random = new Random(Environment.TickCount ^ (batchIndex + 1000)); // Different seed from populate
+
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<PilotLifeDbContext>();
+
+        var saveCounter = 0;
+        const int saveInterval = 50;
+
+        foreach (var dealerSnapshot in dealers)
+        {
+            // Re-fetch the dealer to get a tracked entity
+            var dealer = await context.AircraftDealers
+                .Include(d => d.Inventory.Where(i => !i.IsSold))
+                .FirstOrDefaultAsync(d => d.Id == dealerSnapshot.Id, cancellationToken);
+
+            if (dealer == null) continue;
+
+            // Remove expired inventory
+            var expiredInventory = dealer.Inventory
+                .Where(i => i.ExpiresAt != null && i.ExpiresAt < DateTimeOffset.UtcNow)
+                .ToList();
+
+            foreach (var expired in expiredInventory)
+            {
+                context.DealerInventory.Remove(expired);
+            }
+
+            // Generate new inventory
+            var inventoryCount = GenerateInventoryForDealer(dealer, availableAircraft, context, random);
+            result.InventoryCreated += inventoryCount;
+            result.DealersRefreshed++;
+
+            saveCounter++;
+            if (saveCounter >= saveInterval)
+            {
+                await context.SaveChangesAsync(cancellationToken);
+                saveCounter = 0;
+            }
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogDebug(
+            "Refresh batch {Index} complete: {Dealers} dealers, {Inventory} inventory",
+            batchIndex, result.DealersRefreshed, result.InventoryCreated);
+
+        results.Add(result);
     }
 
     private DealerType[] GetDealerTypesForAirport(string airportType)
@@ -226,9 +392,9 @@ public class MarketplaceGenerator : IMarketplaceGenerator
         };
     }
 
-    private AircraftDealer CreateDealer(Guid worldId, Airport airport, DealerType dealerType)
+    private AircraftDealer CreateDealer(Guid worldId, Airport airport, DealerType dealerType, Random random)
     {
-        var name = GenerateDealerName(airport, dealerType);
+        var name = GenerateDealerName(airport, dealerType, random);
 
         return dealerType switch
         {
@@ -244,10 +410,10 @@ public class MarketplaceGenerator : IMarketplaceGenerator
         };
     }
 
-    private string GenerateDealerName(Airport airport, DealerType dealerType)
+    private static string GenerateDealerName(Airport airport, DealerType dealerType, Random random)
     {
-        var prefix = DealerNamePrefixes[_random.Next(DealerNamePrefixes.Length)];
-        var suffix = DealerNameSuffixes[_random.Next(DealerNameSuffixes.Length)];
+        var prefix = DealerNamePrefixes[random.Next(DealerNamePrefixes.Length)];
+        var suffix = DealerNameSuffixes[random.Next(DealerNameSuffixes.Length)];
 
         return dealerType switch
         {
@@ -383,33 +549,15 @@ public class MarketplaceGenerator : IMarketplaceGenerator
         };
     }
 
-    private bool ShouldRefreshInventory(AircraftDealer dealer)
-    {
-        var daysSinceRefresh = (DateTimeOffset.UtcNow - dealer.LastInventoryRefresh).TotalDays;
-        return daysSinceRefresh >= dealer.InventoryRefreshDays;
-    }
-
-    private async Task<int> GenerateInventoryForDealerAsync(
+    private int GenerateInventoryForDealer(
         AircraftDealer dealer,
         List<Aircraft> allAircraft,
-        CancellationToken cancellationToken)
+        PilotLifeDbContext context,
+        Random random)
     {
-        // Remove expired inventory
-        var expiredInventory = await _context.DealerInventory
-            .Where(i => i.DealerId == dealer.Id &&
-                        !i.IsSold &&
-                        i.ExpiresAt != null &&
-                        i.ExpiresAt < DateTimeOffset.UtcNow)
-            .ToListAsync(cancellationToken);
-
-        _context.DealerInventory.RemoveRange(expiredInventory);
-
-        // Count current active inventory
-        var currentCount = await _context.DealerInventory
-            .CountAsync(i => i.DealerId == dealer.Id && !i.IsSold, cancellationToken);
-
         // Determine how many to add
-        var targetCount = _random.Next(dealer.MinInventory, dealer.MaxInventory + 1);
+        var currentCount = dealer.Inventory?.Count(i => !i.IsSold) ?? 0;
+        var targetCount = random.Next(dealer.MinInventory, dealer.MaxInventory + 1);
         var toAdd = Math.Max(0, targetCount - currentCount);
 
         if (toAdd == 0)
@@ -427,22 +575,22 @@ public class MarketplaceGenerator : IMarketplaceGenerator
             suitableAircraft = allAircraft;
         }
 
-        var inventoryToAdd = new List<DealerInventory>();
+        var inventoryAdded = 0;
 
         for (var i = 0; i < toAdd && suitableAircraft.Count > 0; i++)
         {
-            var aircraft = suitableAircraft[_random.Next(suitableAircraft.Count)];
-            var inventory = CreateInventoryItem(dealer, aircraft);
-            inventoryToAdd.Add(inventory);
+            var aircraft = suitableAircraft[random.Next(suitableAircraft.Count)];
+            var inventory = CreateInventoryItem(dealer, aircraft, random);
+            context.DealerInventory.Add(inventory);
+            inventoryAdded++;
         }
 
-        await _context.DealerInventory.AddRangeAsync(inventoryToAdd, cancellationToken);
         dealer.LastInventoryRefresh = DateTimeOffset.UtcNow;
 
-        return inventoryToAdd.Count;
+        return inventoryAdded;
     }
 
-    private List<Aircraft> FilterAircraftForDealer(DealerType dealerType, List<Aircraft> allAircraft)
+    private static List<Aircraft> FilterAircraftForDealer(DealerType dealerType, List<Aircraft> allAircraft)
     {
         return dealerType switch
         {
@@ -491,10 +639,10 @@ public class MarketplaceGenerator : IMarketplaceGenerator
         };
     }
 
-    private DealerInventory CreateInventoryItem(AircraftDealer dealer, Aircraft aircraft)
+    private static DealerInventory CreateInventoryItem(AircraftDealer dealer, Aircraft aircraft, Random random)
     {
         var isNew = dealer.DealerType == DealerType.ManufacturerShowroom ||
-                    (dealer.MinCondition >= 95 && _random.NextDouble() > 0.5);
+                    (dealer.MinCondition >= 95 && random.NextDouble() > 0.5);
 
         // Calculate base price (use empty weight as proxy for value if no price set)
         var basePrice = CalculateBasePrice(aircraft);
@@ -512,8 +660,8 @@ public class MarketplaceGenerator : IMarketplaceGenerator
         }
 
         // Generate used aircraft characteristics
-        var condition = _random.Next(dealer.MinCondition, dealer.MaxCondition + 1);
-        var totalMinutes = _random.Next(dealer.MinHours * 60, dealer.MaxHours * 60 + 1);
+        var condition = random.Next(dealer.MinCondition, dealer.MaxCondition + 1);
+        var totalMinutes = random.Next(dealer.MinHours * 60, dealer.MaxHours * 60 + 1);
         var totalCycles = totalMinutes / 90; // Rough estimate: 1.5 hour average flight
 
         // Adjust price based on condition and hours
@@ -567,5 +715,42 @@ public class MarketplaceGenerator : IMarketplaceGenerator
         price = Math.Min(50000000m, price); // Maximum $50M
 
         return Math.Round(price, -3); // Round to nearest thousand
+    }
+
+    /// <summary>
+    /// Calculates the great-circle distance between two points using the Haversine formula.
+    /// </summary>
+    private static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double earthRadiusNm = 3440.065; // Earth radius in nautical miles
+
+        var dLat = ToRadians(lat2 - lat1);
+        var dLon = ToRadians(lon2 - lon1);
+
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+        return earthRadiusNm * c;
+    }
+
+    private static double ToRadians(double degrees) => degrees * Math.PI / 180.0;
+
+    // Result tracking classes
+    private class BatchResult
+    {
+        public int BatchIndex { get; set; }
+        public int AirportsProcessed { get; set; }
+        public int DealersCreated { get; set; }
+        public int InventoryCreated { get; set; }
+    }
+
+    private class RefreshResult
+    {
+        public int BatchIndex { get; set; }
+        public int DealersRefreshed { get; set; }
+        public int InventoryCreated { get; set; }
     }
 }

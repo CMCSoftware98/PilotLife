@@ -16,6 +16,9 @@
     <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\FlightData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\AircraftIndexer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\SimConnectManager.h">
@@ -28,6 +31,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\FlightData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Callu\RiderProjects\PilotLife\PilotLife.Connector\src\AircraftIndexer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

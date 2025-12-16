@@ -20,6 +20,7 @@
 #include "SimConnectManager.h"
 #include "ProcessDetector.h"
 #include "FlightData.h"
+#include "AircraftIndexer.h"
 #include <IXNetSystem.h>
 
 // Configuration
@@ -94,6 +95,78 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Initialize Aircraft Indexer for file data
+    std::cout << "Scanning for aircraft packages..." << std::endl;
+    AircraftIndexer aircraftIndexer;
+    if (aircraftIndexer.initialize()) {
+        std::cout << "Indexed " << aircraftIndexer.getIndexedCount() << " aircraft variants" << std::endl;
+    } else {
+        std::cout << "Warning: Could not index aircraft packages. File data will not be available." << std::endl;
+    }
+
+    // Set up message handler for aircraft data requests
+    wsServer.setMessageHandler([&aircraftIndexer](const std::string& message, ix::WebSocket& client) -> std::string {
+        std::cout << "Received: " << message << std::endl;
+
+        // Simple JSON parsing for incoming requests
+        // Looking for: {"type":"getAircraftData","requestId":"...","aircraftTitle":"..."}
+
+        size_t typePos = message.find("\"type\"");
+        if (typePos == std::string::npos) {
+            std::cout << "No type field found" << std::endl;
+            return "";
+        }
+
+        // Extract type value
+        size_t typeValueStart = message.find("\"getAircraftData\"");
+        if (typeValueStart == std::string::npos) {
+            std::cout << "Not a getAircraftData request" << std::endl;
+            return "";
+        }
+
+        // Extract requestId
+        std::string requestId;
+        size_t requestIdPos = message.find("\"requestId\"");
+        if (requestIdPos != std::string::npos) {
+            size_t colonPos = message.find(':', requestIdPos);
+            size_t startQuote = message.find('"', colonPos);
+            size_t endQuote = message.find('"', startQuote + 1);
+            if (startQuote != std::string::npos && endQuote != std::string::npos) {
+                requestId = message.substr(startQuote + 1, endQuote - startQuote - 1);
+            }
+        }
+        std::cout << "RequestId: " << requestId << std::endl;
+
+        // Extract aircraftTitle
+        std::string aircraftTitle;
+        size_t titlePos = message.find("\"aircraftTitle\"");
+        if (titlePos != std::string::npos) {
+            size_t colonPos = message.find(':', titlePos);
+            size_t startQuote = message.find('"', colonPos);
+            size_t endQuote = message.find('"', startQuote + 1);
+            if (startQuote != std::string::npos && endQuote != std::string::npos) {
+                aircraftTitle = message.substr(startQuote + 1, endQuote - startQuote - 1);
+            }
+        }
+        std::cout << "AircraftTitle: " << aircraftTitle << std::endl;
+
+        if (aircraftTitle.empty()) {
+            std::cout << "Empty aircraft title, returning not found" << std::endl;
+            return AircraftIndexer::toNotFoundResponse(requestId);
+        }
+
+        // Look up the aircraft
+        std::cout << "Looking up aircraft..." << std::endl;
+        auto result = aircraftIndexer.findByTitle(aircraftTitle);
+        if (result.has_value()) {
+            std::cout << "Found aircraft data for: " << aircraftTitle << std::endl;
+            return AircraftIndexer::toJsonResponse(result.value(), requestId);
+        } else {
+            std::cout << "Aircraft not found: " << aircraftTitle << std::endl;
+            return AircraftIndexer::toNotFoundResponse(requestId);
+        }
+    });
+
     // Initialize SimConnect manager
     SimConnectManager simConnect;
 
@@ -114,8 +187,9 @@ int main(int argc, char* argv[]) {
         wsServer.broadcast(json);
     });
 
-    // When a new client connects, send them the current status
-    wsServer.setClientConnectedCallback([&simIsConnected, &simIsRunning, &currentSimVersion, &simVersionMutex](ix::WebSocket& client) {
+    // When a new client connects, send them the current status and MSFS paths info
+    wsServer.setClientConnectedCallback([&simIsConnected, &simIsRunning, &currentSimVersion, &simVersionMutex, &aircraftIndexer](ix::WebSocket& client) {
+        // Send simulator status
         SimulatorStatus status;
         status.isConnected = simIsConnected.load();
         status.isSimRunning = simIsRunning.load();
@@ -123,8 +197,12 @@ int main(int argc, char* argv[]) {
             std::lock_guard<std::mutex> lock(simVersionMutex);
             status.simulatorVersion = currentSimVersion;
         }
-        std::string json = "{\"type\":\"status\",\"data\":" + status.toJson() + "}";
-        client.send(json);
+        std::string statusJson = "{\"type\":\"status\",\"data\":" + status.toJson() + "}";
+        client.send(statusJson);
+
+        // Send MSFS paths info
+        std::string pathsJson = aircraftIndexer.toPathsInfoResponse();
+        client.send(pathsJson);
     });
 
     // Main loop - detect MSFS process and connect

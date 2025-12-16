@@ -26,8 +26,19 @@ WebSocketServer::WebSocketServer(int port)
                 std::cerr << "WebSocket error: " << msg->errorInfo.reason << std::endl;
             }
             else if (msg->type == ix::WebSocketMessageType::Message) {
-                // Handle incoming messages if needed (e.g., commands from Tauri app)
-                std::cout << "Received: " << msg->str << std::endl;
+                std::cout << "Received message: " << msg->str << std::endl;
+                // Handle incoming messages via message handler
+                if (this->m_messageHandler) {
+                    std::string response = this->m_messageHandler(msg->str, webSocket);
+                    if (!response.empty()) {
+                        std::cout << "Sending response (" << response.length() << " bytes)" << std::endl;
+                        webSocket.send(response);
+                    } else {
+                        std::cout << "No response to send (empty)" << std::endl;
+                    }
+                } else {
+                    std::cout << "No message handler set" << std::endl;
+                }
             }
         }
     );

@@ -108,11 +108,13 @@ public class JobGenerationBackgroundService : IHostedService, IDisposable
                 {
                     _logger.LogInformation("World {WorldId} has no jobs, performing full population", worldId);
                     await generator.PopulateWorldJobsAsync(worldId);
+                    _logger.LogInformation("World {WorldId} full population finished", worldId);
                 }
                 else
                 {
                     _logger.LogInformation("World {WorldId} has {Count} jobs, refreshing stale airports", worldId, jobCount);
                     await generator.RefreshStaleJobsAsync(worldId);
+                    _logger.LogInformation("World {WorldId} refresh finished", worldId);
                 }
             }
             catch (Exception ex)
@@ -121,7 +123,7 @@ public class JobGenerationBackgroundService : IHostedService, IDisposable
             }
         }
 
-        _logger.LogInformation("Job generation run completed at {Time}", DateTimeOffset.UtcNow);
+        _logger.LogInformation("=== Job generation run COMPLETED at {Time} ===", DateTimeOffset.UtcNow);
     }
 
     public void Dispose()

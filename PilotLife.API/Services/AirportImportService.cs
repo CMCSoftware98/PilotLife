@@ -52,7 +52,15 @@ public class AirportImportService
             BadDataFound = null
         };
 
-        var validTypes = new HashSet<string> { "large_airport", "medium_airport", "small_airport" };
+        // In development, only import large airports for faster startup
+        var validTypes = _environment.IsDevelopment()
+            ? new HashSet<string> { "large_airport" }
+            : new HashSet<string> { "large_airport", "medium_airport", "small_airport" };
+
+        if (_environment.IsDevelopment())
+        {
+            _logger.LogInformation("Development mode: importing only large airports for faster startup");
+        }
         var airports = new List<Airport>();
 
         using (var reader = new StreamReader(csvPath))
